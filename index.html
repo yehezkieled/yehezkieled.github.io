@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hezki · Pocket Room</title>
+  <meta name="description" content="Hezki's personal site: a small 3D trainer's bedroom where the PC, TV, badge case and handhelds open about, work, projects, posts and links.">
+  <meta name="theme-color" content="#15122b">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <script>
+    /*
+      Version router. Runs before anything renders.
+        ?room=1   force the 3D room (remembered)
+        ?plain=1  force the plain page (remembered)
+        ?auto=1   forget the choice and detect again
+      Auto sends phones, data-saver, low-memory devices, and browsers without
+      hardware WebGL 2 to the plain page.
+    */
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var mem = {
+        get: function () { try { return localStorage.getItem("pa-mode"); } catch (e) { return null; } },
+        set: function (v) { try { v ? localStorage.setItem("pa-mode", v) : localStorage.removeItem("pa-mode"); } catch (e) {} }
+      };
+      var pref;
+      if (q.get("room") === "1") pref = "room";
+      else if (q.get("plain") === "1") pref = "plain";
+      else if (q.get("auto") === "1") pref = null;
+      else pref = mem.get();
+      if (q.get("room") === "1" || q.get("plain") === "1" || q.get("auto") === "1") mem.set(pref);
+
+      function capable() {
+        var n = navigator;
+        if (window.innerWidth < 640) return "small screen";
+        if (n.connection && n.connection.saveData) return "data saver";
+        if (n.deviceMemory && n.deviceMemory <= 2) return "low memory";
+        var c = document.createElement("canvas");
+        var gl = c.getContext("webgl2", { failIfMajorPerformanceCaveat: true });
+        if (!gl) return "no hardware WebGL 2";
+        var dbg = gl.getExtension("WEBGL_debug_renderer_info");
+        var r = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "";
+        if (/swiftshader|llvmpipe|software|mesa offscreen/i.test(r)) return "software renderer";
+        return "";
+      }
+
+      var reason = pref === "room" ? "" : pref === "plain" ? "chosen" : capable();
+      window.PA_ROUTE = { pref: pref, reason: reason };
+      if (reason) {
+        location.replace("plain/" + location.hash);
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <link rel="stylesheet" href="assets/ui.css">
+  <link rel="stylesheet" href="assets/room.css">
+  <link rel="modulepreload" href="vendor/three/three.module.min.js">
+</head>
+<body class="room-page">
+  <a class="skip-link" href="#nav">Skip to navigation</a>
+
+  <header class="top">
+    <a class="wordmark px" href="#" id="home-link">Hezki</a>
+    <nav class="nav px" id="nav" aria-label="Sections">
+      <a href="#about" data-go="about">About</a>
+      <a href="#work" data-go="work">Work</a>
+      <a href="#projects" data-go="projects">Projects</a>
+      <a href="#posts" data-go="posts">Posts</a>
+      <a href="#online" data-go="online">Online</a>
+    </nav>
+    <div class="mode" role="group" aria-label="Site version">
+      <span class="on" aria-current="true">Room</span>
+      <a href="plain/?plain=1" title="Plain, text-only version">Plain</a>
+      <a href="?auto=1" title="Let the site pick based on your device">Auto</a>
+    </div>
+  </header>
+
+  <div id="stage" role="img" aria-label="A small 3D bedroom. The PC opens About, the badge case opens Work, the TV and console open Projects, the red handheld opens Posts, the phone opens Online."></div>
+
+  <div id="hint" class="px" aria-hidden="true"></div>
+  <div id="toast" class="px" role="status" aria-live="polite"></div>
+
+  <aside id="panel" class="dlg" hidden aria-labelledby="panel-title" tabindex="-1">
+    <div class="panel-head">
+      <h2 class="dlg-title" id="panel-title">Section</h2>
+      <button type="button" class="close px" id="panel-close" aria-label="Close panel">B · close</button>
+    </div>
+    <div class="panel-body" id="panel-body"></div>
+    <p class="panel-foot px" aria-hidden="true">Esc or click the room to go back</p>
+  </aside>
+
+  <div id="loader" role="dialog" aria-labelledby="loader-title" aria-live="polite">
+    <div class="tv">
+      <div class="tv-screen">
+        <p class="px loader-title" id="loader-title">Pocket Room</p>
+        <div class="bar" aria-hidden="true"><div class="bar-fill" id="bar-fill"></div></div>
+        <p class="px loader-pct"><span id="loader-pct">0</span>%</p>
+        <p class="px loader-status" id="loader-status">Warming up the TV</p>
+        <p class="loader-fallback px">
+          <a href="plain/?plain=1">Skip to the plain version</a>
+        </p>
+      </div>
+      <div class="tv-foot" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <p class="sr-only" id="announce" aria-live="polite"></p>
+
+  <footer class="credit px" aria-hidden="true">Unofficial fan homage · all art hand-made</footer>
+
+  <noscript>
+    <div class="noscript dlg">
+      <p>This version needs JavaScript. <a href="plain/">Open the plain version</a>.</p>
+    </div>
+  </noscript>
+
+  <script src="content.js"></script>
+  <script src="assets/sections.js"></script>
+  <script type="module" src="assets/room.js"></script>
+</body>
+</html>

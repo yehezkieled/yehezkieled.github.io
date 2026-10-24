@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hezki · Plain</title>
+  <meta name="description" content="Hezki's personal site. Plain version: about, work, projects, posts and links.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <link rel="stylesheet" href="../assets/ui.css">
+  <link rel="stylesheet" href="../assets/plain.css">
+  <script>
+    /* Apply the remembered theme before first paint to avoid a flash. */
+    (function () {
+      try {
+        var t = localStorage.getItem("pa-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+      try {
+        var q = new URLSearchParams(location.search);
+        if (q.get("plain") === "1") localStorage.setItem("pa-mode", "plain");
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="top">
+    <a class="wordmark px" href="#top" id="top">Hezki</a>
+    <nav class="nav px" aria-label="Sections">
+      <a href="#about">About</a>
+      <a href="#work">Work</a>
+      <a href="#projects">Projects</a>
+      <a href="#posts">Posts</a>
+      <a href="#online">Online</a>
+    </nav>
+    <div class="controls">
+      <div class="mode" role="group" aria-label="Site version">
+        <a href="../?room=1" title="Interactive 3D room">Room</a>
+        <span class="on" aria-current="true">Plain</span>
+        <a href="../?auto=1" title="Let the site pick based on your device">Auto</a>
+      </div>
+      <div class="mode theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-pick="auto">Auto</button>
+        <button type="button" data-theme-pick="light">Light</button>
+        <button type="button" data-theme-pick="dark">Dark</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow px">Trainer card</p>
+      <h1 id="hero-title">Hi, I'm <span data-site="name">{{site:name}}</span>.</h1>
+      <p class="tagline" data-site="tagline">{{site:tagline}}</p>
+      <p class="intro" data-site="intro">{{site:intro}}</p>
+      <p class="room-cta">
+        <a class="btn" href="../?room=1">Try the 3D room <span aria-hidden="true">→</span></a>
+        <span class="cta-note">Works best on a laptop or iPad.</span>
+      </p>
+    </section>
+
+    <section class="dlg" id="about" aria-labelledby="about-title" data-section="about">
+      {{section:about}}
+    </section>
+
+    <section class="dlg" id="skills" aria-labelledby="skills-title" data-section="skills">
+      {{section:skills}}
+    </section>
+
+    <section class="dlg" id="education" aria-labelledby="education-title" data-section="education">
+      {{section:education}}
+    </section>
+
+    <section class="dlg" id="publications" aria-labelledby="publications-title" data-section="publications">
+      {{section:publications}}
+    </section>
+
+    <section class="dlg" id="work" aria-labelledby="work-title" data-section="work">
+      {{section:work}}
+    </section>
+
+    <section class="dlg" id="projects" aria-labelledby="projects-title" data-section="projects">
+      {{section:projects}}
+    </section>
+
+    <section class="dlg" id="posts" aria-labelledby="posts-title" data-section="posts">
+      {{section:posts}}
+    </section>
+
+    <section class="dlg" id="online" aria-labelledby="online-title" data-section="online">
+      {{section:online}}
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="px">An unofficial fan-made homage. Not affiliated with any game company.</p>
+    <p><a href="#top">Back to top</a> · <a href="../?room=1">3D room</a></p>
+  </footer>
+
+  <script src="../content.js"></script>
+  <script src="../assets/sections.js"></script>
+  <script src="../assets/plain.js"></script>
+</body>
+</html>
