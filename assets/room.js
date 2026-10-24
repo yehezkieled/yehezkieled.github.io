@@ -105,7 +105,7 @@ function makeTex(w, h, draw, repeat, smoothed) {
   ctx.imageSmoothingEnabled = false;
   draw(ctx, w, h);
   const t = new THREE.CanvasTexture(c);
-  // room textures stay chunky pixels; pet skins are sampled smoothly
+  // Default to crisp pixels; callers may opt into smooth sampling.
   t.magFilter = smoothed ? THREE.LinearFilter : THREE.NearestFilter;
   t.minFilter = smoothed ? THREE.LinearMipmapLinearFilter : THREE.NearestFilter;
   t.generateMipmaps = !!smoothed;
@@ -693,7 +693,7 @@ function buildFurniture() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Pets: Piplup and Gible live on the floor                            */
+/* Pets: Piplup and Gible                                             */
 /* ------------------------------------------------------------------ */
 const pets = [];
 const FLOOR_EDGE = 2.72;
@@ -746,7 +746,7 @@ surface("desk", 0.78, [0.8, -2.95, 2.6, -2.15], [
 surface("shelf", 2.075, [-0.8, -2.99, 0.4, -2.71], [-0.58, -0.2, 0.18].map((x) => [...footprint(x, -2.83, 0.22, 0.22), 2.29]));
 SURFACES.sort((a, b) => b.y - a.y);   // highest first: the one under the pointer wins
 
-// can a pet whose centre may come no closer than r stand at (x, z) on surface s?
+// Rectangle containment with an inset r for the point's clearance.
 function inRect(rect, x, z, r = 0) {
   const [x1, z1, x2, z2] = rect;
   return x >= x1 + r && x <= x2 - r && z >= z1 + r && z <= z2 - r;
@@ -1523,11 +1523,11 @@ function buildLandRing() {
   scene.add(landRing);
 }
 
-/* Lifting: press and drag on a pet to carry it; it dangles below the pointer and
-   drops onto a nearby clear floor spot when released. */
-const LIFT_Y = 0.55;        // how high the pet hangs above the floor
-const LIFT_PLANE = 1.05;    // the pointer ray is cut by this horizontal plane
-let lift = null;            // { pet, pointerId, x, z }
+/* Lifting uses a hanging plane above each surface; landingSpot owns clearance
+   and floor fallback, and dropPet rechecks occupancy at release. */
+const LIFT_Y = 0.55;        // hanging height above the target surface
+const LIFT_PLANE = 1.05;    // pointer-ray plane height above the target surface
+let lift = null;
 const liftPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), LIFT_PLANE);
 const liftPoint = new THREE.Vector3();
 
