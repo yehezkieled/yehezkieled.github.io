@@ -14,7 +14,7 @@ Phones, data-saver, low-memory devices and browsers without hardware WebGL 2 are
 
 ## Editing content
 
-All text lives in [`content.js`](content.js). Edit it and push; nothing needs rebuilding.
+All text lives in [`content.js`](content.js). Edit it, run `node scripts/render-plain.mjs`, and commit both the content and updated `plain/index.html`. The command uses the shared section renderer to keep the delivered no-JavaScript page in sync. Edit `plain/template.html` for layout changes; `plain/index.html` is generated.
 
 ## Layout
 
@@ -30,7 +30,7 @@ assets/plain.*      plain page layout + theme switch
 vendor/three/       pinned three.js build (see VERSION)
 ```
 
-No build step. Run any static file server in the repo root to preview, for example `python3 -m http.server 8000`.
+No dependencies to install. Regenerate the plain HTML after editing content or its template. Run any static file server in the repo root to preview, for example `python3 -m http.server 8000`.
 
 All models, textures and icons are hand-made for this site. It is an unofficial fan homage and uses no official game art, sprites, logos, fonts or music.
 

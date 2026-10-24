@@ -22,10 +22,12 @@
         get: function () { try { return localStorage.getItem("pa-mode"); } catch (e) { return null; } },
         set: function (v) { try { v ? localStorage.setItem("pa-mode", v) : localStorage.removeItem("pa-mode"); } catch (e) {} }
       };
-      if (q.get("room") === "1") mem.set("room");
-      else if (q.get("plain") === "1") mem.set("plain");
-      else if (q.get("auto") === "1") mem.set(null);
-      var pref = mem.get();
+      var pref;
+      if (q.get("room") === "1") pref = "room";
+      else if (q.get("plain") === "1") pref = "plain";
+      else if (q.get("auto") === "1") pref = null;
+      else pref = mem.get();
+      if (q.get("room") === "1" || q.get("plain") === "1" || q.get("auto") === "1") mem.set(pref);
 
       function capable() {
         var n = navigator;

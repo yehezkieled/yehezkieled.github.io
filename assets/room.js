@@ -836,12 +836,11 @@ window.addEventListener("hashchange", applyHash);
 /* Render loop                                                         */
 /* ------------------------------------------------------------------ */
 let last = performance.now();
-const CAPTURE = new URLSearchParams(location.search).get("capture") === "1";
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   step(dt);
-  if (!CAPTURE) requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 function step(dt) {
 
@@ -929,7 +928,6 @@ async function boot() {
     const hide = () => { loader.classList.add("hide"); setTimeout(() => { loader.hidden = true; }, REDUCED ? 0 : 420); };
     if (REDUCED) hide(); else setTimeout(hide, 380);
     window.PA_READY = true;
-    if (CAPTURE) window.PA_STEP = (ms) => step(ms / 1000);
   } catch (err) {
     console.error(err);
     failToPlain("This browser could not draw the room. Taking you to the plain version.");
