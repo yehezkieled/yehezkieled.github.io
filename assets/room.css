@@ -78,6 +78,18 @@ body.room-page {
 }
 .room-page .view-reset:hover { background: var(--hud-ink); }
 .room-page .view-reset[hidden] { display: none; }
+.room-page .day-night {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--hud-ink);
+}
+.room-page .day-night:hover { background: var(--amber); }
+.room-page .day-night .moon { display: none; }
+.room-page .day-night[aria-pressed="true"] { background: #2b2640; color: var(--hud-ink); border-color: var(--hud-ink); box-shadow: 3px 3px 0 var(--hud-ink); }
+.room-page .day-night[aria-pressed="true"]:hover { background: #3a3458; }
+.room-page .day-night[aria-pressed="true"] .sun { display: none; }
+.room-page .day-night[aria-pressed="true"] .moon { display: inline; }
 .room-page .mode {
   margin-left: auto;
   border-color: var(--hud-ink);
@@ -123,7 +135,7 @@ body.room-page {
   text-transform: none;
 }
 
-/* ---------- toast (plush lines) ---------- */
+/* ---------- toast (pet lines) ---------- */
 #toast {
   position: fixed;
   z-index: 25;
@@ -269,8 +281,14 @@ body.room-page {
   }
 }
 
+@media (max-width: 820px) {
+  .room-page .top { gap: 10px; padding: 10px; }
+  .room-page .nav { font-size: 8px; }
+  .room-page .nav a { padding: 7px 7px 6px; }
+}
+
 @media (max-width: 640px) {
-  .room-page .top { gap: 8px; padding: 10px; }
+  .room-page .top { gap: 8px; }
   .room-page .nav { font-size: 8px; }
   .room-page .nav a { padding: 7px 7px 6px; }
   .room-page .mode { margin-left: 0; }
