@@ -33,3 +33,9 @@ vendor/three/       pinned three.js build (see VERSION)
 No build step. Run any static file server in the repo root to preview, for example `python3 -m http.server 8000`.
 
 All models, textures and icons are hand-made for this site. It is an unofficial fan homage and uses no official game art, sprites, logos, fonts or music.
+
+## Preview
+
+![Room tour](docs/preview/room-tour.gif)
+
+More in [`docs/preview/`](docs/preview/): a 19-second [MP4 tour](docs/preview/room-tour.mp4) and screenshots at desktop, iPad and phone widths.
