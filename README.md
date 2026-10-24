@@ -7,14 +7,14 @@ Two versions of the same content:
 
 | Version | URL | What it is |
 | --- | --- | --- |
-| Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. Piplup and Gible wander the floor, play, visit each other, react when tapped and can be picked up and carried. With reduced motion enabled, they stay in place and respond without animating. |
+| Room | `/` | A small 3D trainer's bedroom (three.js), shared with Piplup and Gible. Click the PC, badge case, TV, red handheld or phone to open a section. |
 | Plain | `/plain/` | Static, text-first page with the same sections. Light/dark theme. |
 
 In Room, drag to orbit; right-drag, Shift-drag or two-finger drag to pan; scroll or pinch to zoom. Outside the section panel, arrow keys orbit, +/− zoom, and 0 or Home resets the view. The "Reset view" button also resets it: to the selected section's view while a section is open, or to the default room view otherwise.
 
-Tap Piplup or Gible for a reaction (a hop, a chest puff, a chomp, a spin and more; the other one answers when it is close by). Press and drag on one to lift it: it dangles under the pointer or finger and drops onto the nearest clear patch of floor when released. Dragging anywhere else still orbits.
+Piplup and Gible wander, play and visit each other. Tap either for a reaction (a hop, a chest puff, a chomp, a spin and more; the other one answers when it is close by). Press and drag on one to lift it: it dangles under the pointer or finger and drops onto a nearby clear patch of floor when released. Dragging anywhere else still orbits. With reduced motion enabled, they do not wander or animate reactions; lifting and dropping still work.
 
-The Day/Night button in the top bar (or the N key) switches the window sky and the room lighting. The first visit follows the visitor's clock (night from 18:00 to 07:00); a choice is remembered when browser storage is available. The creatures yawn when the lights go down and doze while it is night.
+The Day/Night button in the top bar (or the N key outside the section panel) switches the window sky and the room lighting. The first visit follows the visitor's clock (night from 18:00 to 07:00); a choice is remembered when browser storage is available. The creatures yawn when the lights go down and doze while it is night.
 
 Viewports narrower than 640 pixels, data-saver connections, devices reporting 2 GB of memory or less, and browsers without hardware WebGL 2 are sent to the plain version automatically. On `/`, `?room=1` forces Room, `?plain=1` forces Plain, and `?auto=1` resets the choice and detects again. Explicit queries take precedence over saved preferences; choices are remembered when browser storage is available.
 

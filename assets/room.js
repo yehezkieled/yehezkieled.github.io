@@ -853,7 +853,7 @@ function buildGible() {
   [-1, 1].forEach((s) => {
     const holder = new THREE.Group();
     holder.position.set(s * (R - 0.06), 0.03, -0.02);
-    holder.rotation.set(0, s * (Math.PI / 2 + 0.75), s * 0.12);   // local +y (the point) goes back and out
+    holder.rotation.set(0, s * (Math.PI / 2 + 0.75), s * 0.12);   // local +z (the point) goes back and out
     const jet = cyl(0, 0.07, 0.24, MAT.gibNavy, 0, 0.06, 0, 8);
     jet.rotation.x = Math.PI / 2;   // point along local +z, which the holder turns outward
     jet.scale.set(1, 1, 0.4);       // flat
@@ -915,7 +915,7 @@ function addPet(o) {
   pets.push(p);
 }
 
-/* Short animations. An act plays once over `len` seconds; p.actT runs 1 -> 0. */
+/* Short animations. ACT_LEN sets each act's duration in seconds; p.actT runs 1 -> 0. */
 const ACT_LEN = { hop: 0.9, flap: 1.1, puff: 1.6, spin: 1.0, peck: 0.9, chomp: 0.9, chomps: 1.2, shake: 1.1, wag: 1.3, yawn: 1.8, land: 0.7 };
 function play(p, kind) {
   if (p.held || p.fall) return;
@@ -1170,7 +1170,7 @@ function poseGible(p, o) {
 }
 
 /* Lifting: press and drag on a pet to carry it; it dangles below the pointer and
-   drops onto the nearest clear floor spot when released. */
+   drops onto a nearby clear floor spot when released. */
 const LIFT_Y = 0.55;        // how high the pet hangs above the floor
 const LIFT_PLANE = 1.05;    // the pointer ray is cut by this horizontal plane
 let lift = null;            // { pet, pointerId, x, z }
@@ -1197,7 +1197,7 @@ function moveLift(clientX, clientY) {
   lift.x = clamp(liftPoint.x, -edge, edge);
   lift.z = clamp(liftPoint.z, -edge, edge);
 }
-// nearest clear floor spot to (x, z), searching outward in rings
+// Find a clear floor spot near (x, z), sampling outward in rings.
 function landingSpot(x, z, p) {
   const clear = (nx, nz) => floorClear(nx, nz, p.radius) && pets.every((q) =>
     q === p || Math.hypot(q.x - nx, q.z - nz) >= p.radius + q.radius);
