@@ -10,7 +10,7 @@ Two versions of the same content:
 | Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. |
 | Plain | `/plain/` | Static, text-first page with the same sections. Light/dark theme. |
 
-Phones, data-saver, low-memory devices and browsers without hardware WebGL 2 are sent to the plain version automatically. `?room=1`, `?plain=1` and `?auto=1` force or reset the choice.
+Viewports narrower than 640 pixels, data-saver connections, devices reporting 2 GB of memory or less, and browsers without hardware WebGL 2 are sent to the plain version automatically. On `/`, `?room=1` forces Room, `?plain=1` forces Plain, and `?auto=1` resets the choice and detects again. Explicit queries take precedence over saved preferences; choices are remembered when browser storage is available.
 
 ## Editing content
 
