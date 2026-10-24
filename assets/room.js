@@ -9,11 +9,7 @@
     red handheld on desk  -> posts
     phone on nightstand   -> online
   Plush creatures and the shelf balls are decorative and react when clicked.
-  Piplup and Gible wander the floor, keep clear of the furniture, and hop,
-  turn to the camera and say a line when clicked.
-
-  Looking around: drag orbits, right-drag / shift-drag / two-finger drag pans,
-  wheel or pinch zooms, arrow keys and +/- do the same, 0 resets the view.
+  See README.md for pet interactions and camera controls.
 */
 import * as THREE from "../vendor/three/three.module.min.js";
 

@@ -7,8 +7,10 @@ Two versions of the same content:
 
 | Version | URL | What it is |
 | --- | --- | --- |
-| Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. Drag to look around, scroll or pinch to zoom, press 0 or "Reset view" to go back. Piplup and Gible wander the floor and say hi when clicked. |
+| Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. Piplup and Gible wander the floor and say hi when clicked or tapped. With reduced motion enabled, they stay in place and respond without hopping. |
 | Plain | `/plain/` | Static, text-first page with the same sections. Light/dark theme. |
+
+In Room, drag to orbit; right-drag, Shift-drag or two-finger drag to pan; scroll or pinch to zoom. Outside the section panel, arrow keys orbit, +/− zoom, and 0 or Home resets the view. The "Reset view" button also resets it: to the selected section's view while a section is open, or to the default room view otherwise.
 
 Viewports narrower than 640 pixels, data-saver connections, devices reporting 2 GB of memory or less, and browsers without hardware WebGL 2 are sent to the plain version automatically. On `/`, `?room=1` forces Room, `?plain=1` forces Plain, and `?auto=1` resets the choice and detects again. Explicit queries take precedence over saved preferences; choices are remembered when browser storage is available.
 
