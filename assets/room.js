@@ -702,7 +702,7 @@ const FLOOR_EDGE = 2.72;
    [x1, z1, x2, z2] and the footprints of things standing on it. The floor is
    one too, with the furniture as its blocks. Positions are world coordinates
    read off buildRoom/buildFurniture; keep them in step when furniture moves. */
-const FOOT = 0.05;   // how close a standing pet's centre may come to a surface edge or an object on it
+const FOOT = 0.05;
 const SURFACES = [];
 function surface(name, y, rect, blocks, floor) {
   const s = { name, y, rect, blocks: blocks || [], floor: !!floor };
@@ -716,49 +716,52 @@ function footprint(x, z, w, d, yaw, pad) {
   return [x - ex, z - ez, x + ex, z + ez];
 }
 const FLOOR = surface("floor", 0, [-FLOOR_EDGE, -FLOOR_EDGE, FLOOR_EDGE, FLOOR_EDGE], [
-  [-2.7, -3.0, -1.1, -0.78],  // bed
-  [-3.0, -0.65, -2.35, -0.05], // nightstand
-  [-3.0, 0.3, -2.2, 1.9],      // TV stand
-  [0.75, -3.0, 2.65, -2.1],    // desk
-  [0.88, -2.22, 1.42, -1.68],  // chair
-  [-2.75, 2.05, -2.15, 2.65],  // plant
+  [-2.7, -3.0, -1.1, -0.78, 0.65],  // bed
+  [-3.0, -0.65, -2.35, -0.05, 0.56], // nightstand
+  [-3.0, 0.3, -2.2, 1.9, 0.525],      // TV stand
+  [0.75, -3.0, 2.65, -2.1, 0.78],    // desk
+  [0.88, -2.22, 1.42, -1.68, 0.49],  // chair
+  [-2.75, 2.05, -2.15, 2.65, 1.016],  // plant
 ], true);
 surface("blanket", 0.65, [-2.58, -2.18, -1.22, -0.92]);
 surface("bed", 0.56, [-2.56, -2.9, -1.24, -0.9], [
-  footprint(-1.9, -2.6, 0.86, 0.42),            // pillow
-  [-2.6, -2.18, -1.2, -0.9],                    // blanket (its own surface)
+  [-2.65, -3.01, -1.15, -2.93, 0.63],
+  [...footprint(-1.9, -2.6, 0.86, 0.42), 0.70],            // pillow
+  [-2.6, -2.18, -1.2, -0.9, 0.65],                    // blanket (its own surface)
 ]);
-surface("nightstand", 0.56, [-2.9, -0.6, -2.4, -0.1], [footprint(-2.62, -0.35, 0.3, 0.24)]);   // phone
+surface("nightstand", 0.56, [-2.9, -0.6, -2.4, -0.1], [[...footprint(-2.62, -0.35, 0.34, 0.24), 0.73]]);   // phone
 surface("tv stand", 0.525, [-2.86, 0.33, -2.24, 1.87], [
-  footprint(-2.5, 1.0, 0.6, 0.7, -0.35),        // TV
-  footprint(-2.33, 1.47, 0.32, 0.18, -0.35),    // handheld
-  footprint(-2.67, 0.51, 0.16, 0.22, -0.35),    // cartridges
+  [...footprint(-2.5, 1.0, 0.6, 0.7, -0.35), 1.125],        // TV
+  [...footprint(-2.33, 1.47, 0.32, 0.18, -0.35), 0.605],    // handheld
+  [...footprint(-2.67, 0.51, 0.16, 0.22, -0.35), 0.637],    // cartridges
 ]);
-surface("chair", 0.49, [0.92, -2.18, 1.38, -1.72], [[0.9, -2.2, 1.4, -2.12]]);   // backrest
+surface("chair", 0.49, [0.92, -2.18, 1.38, -1.72], [[0.9, -2.2, 1.4, -2.12, 0.99]]);   // backrest
 surface("desk", 0.78, [0.8, -2.95, 2.6, -2.15], [
-  footprint(1.3, -2.72, 0.6, 0.5),              // PC
-  footprint(1.35, -2.24, 0.5, 0.18),            // keyboard
-  footprint(1.72, -2.27, 0.08, 0.12),           // mouse
-  footprint(2.25, -2.3, 0.22, 0.32, -0.35),     // red handheld
-  footprint(2.45, -2.75, 0.24, 0.24),           // lamp
+  [...footprint(1.3, -2.72, 0.6, 0.5), 1.30],              // PC
+  [...footprint(1.35, -2.24, 0.5, 0.18), 0.827],            // keyboard
+  [...footprint(1.72, -2.27, 0.08, 0.12), 0.81],           // mouse
+  [...footprint(2.25, -2.3, 0.22, 0.32, -0.35), 0.835],     // red handheld
+  [...footprint(2.45, -2.75, 0.32, 0.32), 1.41],           // lamp
 ]);
-surface("shelf", 2.075, [-0.8, -2.99, 0.4, -2.71], [-0.58, -0.2, 0.18].map((x) => footprint(x, -2.83, 0.22, 0.22)));
+surface("shelf", 2.075, [-0.8, -2.99, 0.4, -2.71], [-0.58, -0.2, 0.18].map((x) => [...footprint(x, -2.83, 0.22, 0.22), 2.29]));
 SURFACES.sort((a, b) => b.y - a.y);   // highest first: the one under the pointer wins
 
 // can a pet whose centre may come no closer than r stand at (x, z) on surface s?
-function onSurface(s, x, z, r) {
-  const [x1, z1, x2, z2] = s.rect;
-  if (x < x1 + r || x > x2 - r || z < z1 + r || z > z2 - r) return false;
+function inRect(rect, x, z, r = 0) {
+  const [x1, z1, x2, z2] = rect;
+  return x >= x1 + r && x <= x2 - r && z >= z1 + r && z <= z2 - r;
+}
+function onSurface(s, x, z, r, obstacleRadius = r) {
+  if (!inRect(s.rect, x, z, r)) return false;
   for (const [bx1, bz1, bx2, bz2] of s.blocks) {
-    if (x > bx1 - r && x < bx2 + r && z > bz1 - r && z < bz2 + r) return false;
+    if (x > bx1 - obstacleRadius && x < bx2 + obstacleRadius && z > bz1 - obstacleRadius && z < bz2 + obstacleRadius) return false;
   }
   return true;
 }
-// on the floor a pet keeps its whole radius from furniture; on top of furniture only its feet must fit
-const margin = (p, s) => (s.floor ? p.radius : FOOT);
 function standClear(p, x, z, s) {
   s = s || p.surface;
-  return onSurface(s, x, z, margin(p, s));
+  return inRect([-3, -3, 3, 3], x, z, p.radius) &&
+    onSurface(s, x, z, s.floor ? p.radius : FOOT, p.radius);
 }
 function pathClear(p, ax, az, bx, bz) {
   const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.08));
@@ -768,11 +771,6 @@ function pathClear(p, ax, az, bx, bz) {
   }
   return true;
 }
-// is (x, z) over any object standing on s? (water drops splash against them)
-function overBlock(s, x, z) {
-  return s.blocks.some(([x1, z1, x2, z2]) => x > x1 && x < x2 && z > z1 && z < z2);
-}
-
 /* Sculpting helpers: the pets are low-poly, so every part keeps its segment
    count small and its material flat-shaded, and faces are painted as pixel decals. */
 function ellipsoid(rx, ry, rz, material, x, y, z, seg, hseg) {
@@ -1412,7 +1410,8 @@ function stepParticles(dt) {
       d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
       // drops splash on the surface the pet stands on, on things standing on it, the floor and the walls
       const ground = onSurface(d.s, d.x, d.z, 0) ? d.s.y : 0;
-      const hit = d.y <= ground + 0.012 || d.x < -2.95 || d.z < -2.95 || (d.y < d.s.y + 0.3 && overBlock(d.s, d.x, d.z));
+      const hit = d.y <= ground + 0.012 || d.x < -2.95 || d.z < -2.95 || SURFACES.some((s) => d.y >= s.y && s.blocks.some(([x1, z1, x2, z2, top]) =>
+        d.y < top && d.x > x1 && d.x < x2 && d.z > z1 && d.z < z2));
       if (hit && d.splash) {
         for (let k = 0; k < 3; k++) spawn(drops, d.x, Math.max(d.y, ground + 0.012), d.z, (Math.random() - 0.5) * 0.5, 0.4 + Math.random() * 0.5, (Math.random() - 0.5) * 0.5, 0.3, 0.55, false, d.s);
       }
@@ -1507,11 +1506,11 @@ function moveLift(clientX, clientY) {
   for (const s of SURFACES) {
     liftPlane.constant = s.y + LIFT_PLANE;
     if (!raycaster.ray.intersectPlane(liftPlane, liftPoint)) continue;
-    if (!s.floor && !onSurface(s, liftPoint.x, liftPoint.z, 0)) continue;
+    if (!s.floor && !inRect(s.rect, liftPoint.x, liftPoint.z)) continue;
     lift.surface = s;
     const edge = FLOOR_EDGE - lift.pet.radius;
-    lift.x = clamp(liftPoint.x, -edge, edge);
-    lift.z = clamp(liftPoint.z, -edge, edge);
+    lift.x = s.floor ? clamp(liftPoint.x, -edge, edge) : liftPoint.x;
+    lift.z = s.floor ? clamp(liftPoint.z, -edge, edge) : liftPoint.z;
     break;
   }
   lift.land = landingSpot(lift.x, lift.z, lift.pet, lift.surface);
