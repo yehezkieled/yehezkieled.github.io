@@ -737,11 +737,11 @@ surface("tv stand", 0.525, [-2.86, 0.33, -2.24, 1.87], [
 ]);
 surface("chair", 0.49, [0.92, -2.18, 1.38, -1.72], [[0.9, -2.2, 1.4, -2.12, 0.99]]);   // backrest
 surface("desk", 0.78, [0.8, -2.95, 2.6, -2.15], [
-  [...footprint(1.3, -2.72, 0.6, 0.5), 1.30],              // PC
+  [...footprint(1.3, -2.72, 0.3, 0.3), 1.30],              // PC
   [...footprint(1.35, -2.24, 0.5, 0.18), 0.827],            // keyboard
   [...footprint(1.72, -2.27, 0.08, 0.12), 0.81],           // mouse
   [...footprint(2.25, -2.3, 0.22, 0.32, -0.35), 0.835],     // red handheld
-  [...footprint(2.45, -2.75, 0.32, 0.32), 1.41],           // lamp
+  [...footprint(2.45, -2.75, 0.24, 0.24), 1.41],           // lamp
 ]);
 surface("shelf", 2.075, [-0.8, -2.99, 0.4, -2.71], [-0.58, -0.2, 0.18].map((x) => [...footprint(x, -2.83, 0.22, 0.22), 2.29]));
 SURFACES.sort((a, b) => b.y - a.y);   // highest first: the one under the pointer wins
@@ -758,16 +758,35 @@ function onSurface(s, x, z, r, obstacleRadius = r) {
   }
   return true;
 }
+function furnitureYaw(p, x, z, s, yaw = p.yaw) {
+  const points = p.name === "Gible"
+    ? [[0, -0.35], [-0.31, -0.03], [0.31, -0.03], [0, 0.21]]
+    : [[-0.29, 0.01], [0.29, 0.01], [0, -0.18], [0, 0.21]];
+  const clear = (angle) => points.every(([px, pz]) => {
+    const c = Math.cos(angle), sn = Math.sin(angle);
+    const nx = x + px * c + pz * sn, nz = z - px * sn + pz * c;
+    return inRect([-3, -3, 3, 3], nx, nz, 0.01) &&
+      !s.blocks.some(([x1, z1, x2, z2]) => nx > x1 - 0.01 && nx < x2 + 0.01 && nz > z1 - 0.01 && nz < z2 + 0.01);
+  });
+  if (clear(yaw)) return yaw;
+  for (let i = 0; i < 32; i++) {
+    const angle = i * Math.PI / 16;
+    if (clear(angle)) return angle;
+  }
+  return null;
+}
 function standClear(p, x, z, s) {
   s = s || p.surface;
   return inRect([-3, -3, 3, 3], x, z, p.radius) &&
-    onSurface(s, x, z, s.floor ? p.radius : FOOT, p.radius);
+    onSurface(s, x, z, s.floor ? p.radius : FOOT, p.radius) &&
+    (s.floor || furnitureYaw(p, x, z, s) !== null);
 }
 function pathClear(p, ax, az, bx, bz) {
   const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.08));
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    if (!standClear(p, ax + (bx - ax) * t, az + (bz - az) * t)) return false;
+    const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+    if (!standClear(p, x, z)) return false;
   }
   return true;
 }
@@ -922,7 +941,7 @@ function buildPiplup() {
   });
 
   addPet({
-    name: "Piplup", group: g, x: 0.9, z: 0.9, yaw: 0.9, speed: 0.32, radius: 0.40,
+    name: "Piplup", group: g, x: 0.9, z: 0.9, yaw: 0.9, speed: 0.32, radius: 0.22,
     pose: posePiplup,
     idle: ["flap", "puff", "peck", "flap"],
     taps: ["hop", "puff", "flap", "spin", "peck"],
@@ -1033,7 +1052,7 @@ function buildGible() {
   });
 
   addPet({
-    name: "Gible", group: g, x: 1.9, z: 1.6, yaw: -0.6, speed: 0.4, radius: 0.46,
+    name: "Gible", group: g, x: 1.9, z: 1.6, yaw: -0.6, speed: 0.4, radius: 0.26,
     pose: poseGible,
     idle: ["chomp", "chomps", "wag", "wag"],
     taps: ["chomp", "spin", "chomps", "shake"],
@@ -1198,6 +1217,10 @@ function stepPets(dt) {
     const snap = REDUCED ? 1 : dt * 7;
     p.yaw = turnToward(p.yaw, p.yawGoal, snap);
     p.headYaw = turnToward(p.headYaw, p.headGoal, snap);
+    if (!p.surface.floor && !p.held && !p.fall) {
+      p.yaw = furnitureYaw(p, p.x, p.z, p.surface) ?? p.yaw;
+      p.headYaw = 0;
+    }
     if (!REDUCED) p.age += dt;
 
     const o = {
@@ -1217,6 +1240,12 @@ function stepPets(dt) {
       o.spin = Math.sin(p.age * 6) * 0.08;
     }
     p.pose(p, o);
+    if (!p.surface.floor && !p.held && !p.fall) {
+      o.rx = o.rz = o.spin = 0;
+      o.sx = o.sy = o.sz = 1;
+      if (p.parts.tail) p.parts.tail.rotation.y = 0;
+      if (p.parts.flippers) p.parts.flippers.forEach((f, i) => f.rotation.set(0, 0, (i ? 1 : -1) * 0.28));
+    }
     constrainLunge(p, o);
     if (p.act === p.move) stepMove(p, o, dt);
     p.group.position.set(p.x + Math.sin(p.yaw) * o.lunge, o.y, p.z + Math.cos(p.yaw) * o.lunge);
@@ -1235,11 +1264,13 @@ function stepPets(dt) {
 function constrainLunge(p, o) {
   if (!o.lunge) return;
   const dx = Math.sin(p.yaw) * o.lunge, dz = Math.cos(p.yaw) * o.lunge;
+  const clear = (t) => pathClear(p, p.x, p.z, p.x + dx * t, p.z + dz * t) &&
+    (p.surface.floor || furnitureYaw(p, p.x + dx * t, p.z + dz * t, p.surface, p.yaw) === p.yaw);
   let low = 0, high = 1;
-  if (pathClear(p, p.x, p.z, p.x + dx, p.z + dz)) return;
+  if (clear(1)) return;
   for (let i = 0; i < 12; i++) {
     const t = (low + high) / 2;
-    if (pathClear(p, p.x, p.z, p.x + dx * t, p.z + dz * t)) low = t;
+    if (clear(t)) low = t;
     else high = t;
   }
   o.lunge *= low;
@@ -1552,11 +1583,12 @@ function landingSpot(x, z, p, s) {
 function dropPet() {
   if (!lift) return;
   const p = lift.pet;
-  const { x, z, s } = lift.land || landingSpot(p.x, p.z, p, lift.surface);
+  const { x, z, s } = landingSpot(lift.x, lift.z, p, lift.surface);
   lift = null;
   landRing.visible = false;
   p.held = false;
   p.surface = s; p.ground = s.y;
+  if (!s.floor) p.yaw = p.yawGoal = furnitureYaw(p, x, z, s);
   if (REDUCED) {
     p.x = x; p.z = z;
     say(p.lines.land);
