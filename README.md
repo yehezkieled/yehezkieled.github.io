@@ -44,4 +44,4 @@ All models, textures and icons are hand-made for this site. It is an unofficial 
 
 ![Room tour](docs/preview/room-tour.gif)
 
-More in [`docs/preview/`](docs/preview/): a 19-second [MP4 tour](docs/preview/room-tour.mp4), a [before/after video of Piplup and Gible](docs/preview/pets-before-after.mp4) (idle, walking, tap reactions, tantrums with Water Gun and Bite, lifting onto the bed and the desk; also as [GIF](docs/preview/pets-before-after.gif)), close-ups of each creature, and screenshots at desktop, iPad and phone widths.
+More in [`docs/preview/`](docs/preview/): a 19-second [MP4 tour](docs/preview/room-tour.mp4), a [before/after video of Piplup and Gible](docs/preview/pets-before-after.mp4) (idle, walking, tap reactions, tantrums with Water Gun and Bite, lifting both onto the bed; also as [GIF](docs/preview/pets-before-after.gif)), turnaround sheets of [Piplup](docs/preview/pets-turnaround-piplup.png) and [Gible](docs/preview/pets-turnaround-gible.png), close-ups of each creature, and screenshots at desktop, iPad and phone widths.

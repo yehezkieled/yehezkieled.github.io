@@ -244,8 +244,8 @@ function buildTextures() {
   wrap a SphereGeometry: canvas x runs around the body (u = 0.25 is the front,
   0.75 the back), canvas y runs top to bottom.
 */
-const PIP = { light: "#9bd8ee", dark: "#2d62b5", edge: "#214c95", eye: "#15285e", eyeLit: "#2f6cc8", beak: "#f2c23c", white: "#f7fbff", ring: "#4a86c4", mouth: "#b8323f" };
-const GIB = { blue: "#4f84a3", dark: "#3b6682", belly: "#d8402e", bellyEdge: "#b2302a", mouth: "#4d1522", tongue: "#f06a8a", eye: "#1e2538", spot: "#f2d14a" };
+const PIP = { light: "#9bd8ee", dark: "#2d62b5", edge: "#214c95", eye: "#15285e", eyeLit: "#2f6cc8", beak: "#f2c23c", white: "#ffffff", ring: "#4a86c4", mouth: "#b8323f" };
+const GIB = { blue: "#4f84a3", dark: "#3b6682", belly: "#d8402e", bellyEdge: "#b2302a", mouth: "#6a1d2a", tongue: "#f06a8a", eye: "#141a2c", spot: "#f2d14a", tooth: "#fff8ee" };
 const PINK = "#f49ab2";
 
 function pixelTex(w, h, draw) {
@@ -287,33 +287,36 @@ function blushTex() {
 }
 
 function buildPetTextures() {
-  // Piplup head: dark cap and sides, white face with a zigzag edge and a dark peak between the eyes.
+  // Piplup head: dark cap and sides; a bright white mask on the front under a zigzag cap edge
+  // (points down at the centre and over each eye), split by a light-blue peak that runs down to the beak.
   TEX.pipHead = pixelTex(128, 64, (ctx, w, h) => {
     ctx.fillStyle = PIP.dark; ctx.fillRect(0, 0, w, h);
-    const zig = [0, 1, 2, 1];
-    for (let x = 4; x < 61; x++) {
+    for (let x = 10; x <= 54; x++) {
       const d = Math.abs(x - 32);
-      let top = 22 + zig[x % 4];
-      if (d < 6) top = Math.max(top, 34 - d * 2);            // the peak dips to the beak
-      if (d > 22) top += (d - 22) * 2;                        // cheeks round off toward the ears
-      const bottom = 56 - Math.max(0, d - 18) * 1.4;
+      let top = 17 + 7 - Math.abs((d % 14) - 7);               // zigzag: points at d = 0, 14; notches at d = 7, 21
+      if (d > 15) top += (d - 15) * 1.5;                        // the mask rounds off toward the sides
+      const bottom = 58 - Math.max(0, d - 10) * 1.6;
       if (bottom <= top) continue;
       ctx.fillStyle = PIP.edge; ctx.fillRect(x, top - 1, 1, 1);
       ctx.fillStyle = PIP.white; ctx.fillRect(x, top, 1, bottom - top);
+    }
+    for (let y = 22; y < 37; y++) {                             // the light peak between the eyes: wide at the cap, a point at the beak
+      const half = y < 25 ? 5 : y < 28 ? 4 : y < 31 ? 3 : y < 34 ? 2 : 1;
+      ctx.fillStyle = PIP.light; ctx.fillRect(32 - half, y, half * 2, 1);
     }
   });
 
   // Piplup body: light blue with a scalloped dark collar, a cape down the back and two ringed chest marks.
   TEX.pipBody = pixelTex(128, 64, (ctx, w, h) => {
     ctx.fillStyle = PIP.light; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = PIP.dark; ctx.fillRect(0, 0, w, 11);
-    for (let i = 0; i < 13; i++) pxEllipse(ctx, i * 10 + 5, 11, 4.5, 4.5, PIP.dark);
-    for (let x = 66; x < 126; x++) {                          // cape: a pointed dark panel on the back
+    ctx.fillStyle = PIP.dark; ctx.fillRect(0, 0, w, 26);
+    for (let i = -1; i < 10; i++) pxEllipse(ctx, i * 14 + 4, 26, 6.5, 6.5, PIP.dark);   // scallops: a lobe at the front centre and every 14 px around
+    for (let x = 60; x < 132; x++) {                          // cape: a pointed dark panel down the back
       const d = Math.abs(x - 96);
-      const bottom = 42 - Math.max(0, d - 8) * 1.6;
-      if (bottom > 11) ctx.fillRect(x, 11, 1, bottom - 11);
+      const bottom = 48 - Math.max(0, d - 10) * 1.5;
+      if (bottom > 26) ctx.fillRect(x % w, 26, 1, bottom - 26);
     }
-    for (const cx of [24, 40]) pxEllipse(ctx, cx, 36, 5, 5, PIP.white, PIP.ring);
+    for (const cx of [24, 40]) pxEllipse(ctx, cx, 44, 5, 5, PIP.white, PIP.ring);
   });
   TEX.pipEyeL = eyeTex(14, 18, -1, { iris: PIP.eye, ring: "#c8e9f8", lit: PIP.eyeLit, spark: PIP.white });
   TEX.pipEyeR = eyeTex(14, 18, 1, { iris: PIP.eye, ring: "#c8e9f8", lit: PIP.eyeLit, spark: PIP.white });
@@ -328,20 +331,12 @@ function buildPetTextures() {
       ctx.fillStyle = GIB.belly; ctx.fillRect(rim + 1, y, w - rim * 2 - 2, 1);
     }
   });
-  // Gible teeth: a strip of pixel triangles, drawn pointing down; the lower row flips it.
-  TEX.gibTeeth = pixelTex(128, 8, (ctx, w, h) => {
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#fff8ee";
-    for (let x = 0; x < w; x++) {
-      const t = x % 8, half = t < 4 ? t + 1 : 8 - t;      // 1,2,3,4,4,3,2,1 pixels tall
-      ctx.fillRect(x, 0, 1, half * 2 - 1);
-    }
-  });
-  // Gible side jets: slate with two yellow spots on the outer side.
+  // Gible side jets: slate with two yellow spots on the outer side and one facing front.
   TEX.gibJet = pixelTex(64, 32, (ctx, w, h) => {
     ctx.fillStyle = GIB.blue; ctx.fillRect(0, 0, w, h);
     pxEllipse(ctx, 32, 11, 3, 3, GIB.spot);
     pxEllipse(ctx, 33, 21, 2.5, 2, GIB.spot);
+    pxEllipse(ctx, 17, 15, 2.5, 2.5, GIB.spot);
   });
   // the anger mark: four red lobes around a gap
   TEX.angry = pixelTex(16, 16, (ctx, w, h) => {
@@ -349,8 +344,8 @@ function buildPetTextures() {
     for (const [x, y] of [[5, 5], [11, 5], [5, 11], [11, 11]]) pxEllipse(ctx, x, y, 2.5, 2.5, "#e0423a", "#8e1f1f");
     ctx.clearRect(7, 0, 2, h); ctx.clearRect(0, 7, w, 2);
   });
-  TEX.gibEyeL = eyeTex(14, 14, -1, { iris: GIB.eye, ring: "#2f3d58", lit: "#3a4668", spark: PIP.white });
-  TEX.gibEyeR = eyeTex(14, 14, 1, { iris: GIB.eye, ring: "#2f3d58", lit: "#3a4668", spark: PIP.white });
+  TEX.gibEyeL = eyeTex(16, 16, -1, { iris: GIB.eye, ring: "#e9eef7", lit: "#2a3352", spark: PIP.white });
+  TEX.gibEyeR = eyeTex(16, 16, 1, { iris: GIB.eye, ring: "#e9eef7", lit: "#2a3352", spark: PIP.white });
 }
 
 function screenTex(lines, accent, bg) {
@@ -431,7 +426,7 @@ function buildMaterials() {
   const pmat = (color, opts) => mat(color, Object.assign({ flatShading: true }, opts || {}));
   const decal = (map) => pmat("#ffffff", { map, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
   MAT.pipBody = pmat("#ffffff", { map: TEX.pipBody });
-  MAT.pipHead = pmat("#ffffff", { map: TEX.pipHead });
+  MAT.pipHead = pmat("#ffffff", { map: TEX.pipHead, emissive: "#ffffff", emissiveMap: TEX.pipHead, emissiveIntensity: 0.22 });
   MAT.pipLight = pmat(PIP.light);
   MAT.pipDark = pmat(PIP.dark);
   MAT.pipMouth = pmat(PIP.mouth);
@@ -445,7 +440,7 @@ function buildMaterials() {
   MAT.gibJet = pmat("#ffffff", { map: TEX.gibJet });
   MAT.gibMouth = pmat(GIB.mouth, { side: THREE.DoubleSide });
   MAT.gibTongue = pmat(GIB.tongue);
-  MAT.gibTeeth = decal(TEX.gibTeeth);
+  MAT.gibTeeth = pmat(GIB.tooth);
   MAT.gibEyeL = decal(TEX.gibEyeL);
   MAT.gibEyeR = decal(TEX.gibEyeR);
   MAT.angry = new THREE.SpriteMaterial({ map: TEX.angry, transparent: true, alphaTest: 0.5 });
@@ -888,7 +883,7 @@ function buildPiplup() {
   const R = 0.15, RY = 0.145, R2 = R + 0.004;
   head.add(ellipsoid(R, RY, R, MAT.pipHead, 0, 0, 0, 12, 8));
   const eyes = [-1, 1].map((s) => {   // big navy sparkle eyes on the white face
-    const e = decalPatch(R2, RY + 0.004, R2, Math.PI / 2 + s * 0.4, Math.PI / 2 - 0.02, 0.07, 0.095, s < 0 ? MAT.pipEyeL : MAT.pipEyeR);
+    const e = decalPatch(R2, RY + 0.004, R2, Math.PI / 2 + s * 0.4, Math.PI / 2 - 0.02, 0.075, 0.1, s < 0 ? MAT.pipEyeL : MAT.pipEyeR);
     head.add(e);
     return e;
   });
@@ -959,6 +954,7 @@ function buildPiplup() {
 
 // Gible: one tall faceted egg of a body, the lower front all mouth. Faces +z.
 const GIB_BODY_Y = 0.27;
+const GIB_REST = 0.5;   // the jaw hangs this far open (radians) when nothing else is going on
 function buildGible() {
   const g = new THREE.Group();
   const RX = 0.2, RY = 0.235, RZ = 0.19, TH = Math.PI * 0.52;   // the lip line sits just below the middle
@@ -984,30 +980,28 @@ function buildGible() {
   jawShell.add(sphereSlice(1, MAT.gibJaw, 0, Math.PI, TH, Math.PI - TH, 6, 4));
   jawShell.add(disc(ringR, MAT.gibMouth, ringY + 0.01, true));                              // floor of the mouth
   jaw.add(jawShell);
-  jaw.add(ellipsoid(0.08, 0.02, 0.09, MAT.gibTongue, 0, 0.012, 0.06, 6, 3));
+  jaw.add(ellipsoid(0.1, 0.024, 0.105, MAT.gibTongue, 0, 0.014, 0.05, 6, 3));   // the tongue fills the jaw
   head.add(jaw);
 
-  // teeth: pixel zigzag strips lining the front half of each lip
-  const teeth = (down) => {
-    const r = ringR * RX + 0.004;
-    const geo = new THREE.CylinderGeometry(r, r, 0.024, 12, 1, true, -Math.PI / 2, Math.PI);
-    geo.scale(1, 1, RZ / RX);
-    const m = new THREE.Mesh(geo, MAT.gibTeeth);
-    if (!down) m.rotation.z = Math.PI;
-    m.position.y = down ? ringY * RY - 0.011 : 0.011;
-    return m;
-  };
-  head.add(teeth(true));
-  jaw.add(teeth(false));
+  // teeth: four-sided fangs standing on the lip rims, merged per row. Each entry is
+  // [angle around the rim from the front, size]; the big ones sit at the corners.
+  const tooth = new THREE.ConeGeometry(0.014, 0.04, 4);
+  const fangs = (list, down) => merged(list.map(([a, k]) => placed(
+    tooth, RX * ringR * Math.sin(a) * 0.94, (down ? -0.016 : 0.016) * k, RZ * ringR * Math.cos(a) * 0.94,
+    down ? Math.PI : 0, a, 0, k, k, k)), MAT.gibTeeth);
+  const upper = fangs([[-1.1, 1.3], [-0.45, 0.75], [0.45, 0.75], [1.1, 1.3]], true);
+  upper.position.y = ringY * RY;
+  head.add(upper);
+  jaw.add(fangs([[-0.9, 1], [-0.3, 0.6], [0.3, 0.6], [0.9, 1]], false));
 
-  // eyes: big round sparkle eyes high on the front, blush under them
+  // eyes: big black sparkle eyes side by side on the front, blush under them
   const RX2 = RX + 0.004, RY2 = RY + 0.004, RZ2 = RZ + 0.004;
   const eyes = [-1, 1].map((s) => {
-    const e = decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.55, Math.PI * 0.39, 0.1, 0.1, s < 0 ? MAT.gibEyeL : MAT.gibEyeR);
+    const e = decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.42, Math.PI * 0.365, 0.11, 0.11, s < 0 ? MAT.gibEyeL : MAT.gibEyeR);
     head.add(e);
     return e;
   });
-  [-1, 1].forEach((s) => head.add(decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.85, Math.PI * 0.48, 0.05, 0.03, MAT.blush)));
+  [-1, 1].forEach((s) => head.add(decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.8, Math.PI * 0.455, 0.055, 0.03, MAT.blush)));
 
   // tall dorsal fin swept back
   const fin = extruded([[0.06, 0], [0.03, 0.1], [-0.04, 0.22], [-0.11, 0.2], [-0.1, 0.1], [-0.14, 0]], 0.05, MAT.gibBlue);
@@ -1023,10 +1017,12 @@ function buildGible() {
     head.add(jet);
   });
 
-  // stubby arms angled out and forward
+  // stubby arms: flat pointed fins angled down, out and a little forward
   [-1, 1].forEach((s) => {
-    const arm = cyl(0.015, 0.04, 0.13, MAT.gibBlue, s * (RX + 0.01), -0.06, 0.05, 5);
-    arm.rotation.set(0.5, 0, s * 1.9);
+    const arm = extruded([[0, 0.03], [0.11, 0.012], [0.13, -0.008], [0.02, -0.032]], 0.022, MAT.gibBlue);
+    arm.position.set(s * (RX - 0.02), -0.03, 0.04);
+    arm.rotation.set(0.35, -s * 0.45, -s * 0.6);
+    arm.scale.x = s;
     head.add(arm);
   });
   g.add(head);
@@ -1342,48 +1338,49 @@ function posePiplup(p, o) {
 function poseGible(p, o) {
   const P = p.parts, k = o.kind, u = o.u, bump = o.bump;
   const g = o.walking ? p.age * 7.5 : 0;
-  let open = 0.12, wag = 0, tuck = 0;
-  if (o.walking) {   // jaw-first hops: mouth drops open in the air and snaps shut on landing
+  let open = GIB_REST, wag = 0, tuck = 0;
+  if (o.walking) {   // jaw-first hops: mouth gapes wider in the air and drops back on landing
     const h = Math.max(0, Math.sin(g));
     o.y += h * 0.1;
     o.rx = -Math.sin(g * 2) * 0.17 * (h > 0 ? 1 : 0);
-    open += h * 0.45;
+    open += h * 0.35;
     tuck = h;
     wag = Math.sin(g) * 0.25;
   }
   if (k === "chomp") {   // one big chomp with a hop
     o.y += bump * 0.2;
-    open += Math.sin(Math.min(1, u * 1.3) * Math.PI) * 0.95;
+    open += Math.sin(Math.min(1, u * 1.3) * Math.PI) * 0.65;
     o.rx = Math.sin(u * Math.PI * 2) * 0.2;
     o.sx = o.sz = 1 - bump * 0.08; o.sy = 1 + bump * 0.1;
   } else if (k === "chomps") {   // three quick snaps
     const c = Math.max(0, Math.sin(u * Math.PI * 6));
-    open += c * 0.65 * Math.min(1, bump * 2);
+    open += c * 0.5 * Math.min(1, bump * 2);
     o.rx = c * 0.08;
   } else if (k === "spin") {
-    o.spin = smooth(u) * Math.PI * 2; o.y += bump * 0.12; open += bump * 0.5;
+    o.spin = smooth(u) * Math.PI * 2; o.y += bump * 0.12; open += bump * 0.4;
   } else if (k === "shake") {
     o.rz = Math.sin(u * Math.PI * 5) * 0.22 * bump; open += bump * 0.3;
     wag = Math.sin(u * Math.PI * 5) * 0.6 * bump;
   } else if (k === "wag") {
     wag = Math.sin(u * Math.PI * 6) * 0.55 * bump; open += bump * 0.12;
   } else if (k === "yawn") {   // a slow, wide yawn
-    open += Math.sin(Math.min(1, u * 1.15) * Math.PI) * 0.8;
+    open += Math.sin(Math.min(1, u * 1.15) * Math.PI) * 0.6;
     o.rx = -bump * 0.12;
   } else if (k === "land") {
     o.sy = 1 - bump * 0.2; o.sx = o.sz = 1 + bump * 0.12;
-    open += Math.max(0, Math.sin(u * Math.PI * 2)) * 0.5;
+    open += Math.max(0, Math.sin(u * Math.PI * 2)) * 0.4;
   } else if (k === "tantrum") {   // stomping and shaking, jaw chattering
     const st = REDUCED ? 0 : Math.abs(Math.sin(u * Math.PI * 7));
     o.y += st * 0.03; o.rz = REDUCED ? 0 : Math.sin(u * Math.PI * 14) * 0.1;
     open += 0.2 + st * 0.3; wag = REDUCED ? 0 : Math.sin(u * Math.PI * 10) * 0.5;
     tuck = st;
-  } else if (k === "bite") {   // crouch back, lunge with the jaw wide, snap shut
+  } else if (k === "bite") {   // crouch back, lunge with the jaw wide, snap it shut, let it fall open again
     if (REDUCED) { open += 0.6; }
     else {
       const wind = Math.min(1, u * 3.3), lungeT = smooth(clamp((u - 0.3) * 5, 0, 1)), back = smooth(clamp((u - 0.65) * 3, 0, 1));
       o.lunge = -0.05 * wind + (0.19 * lungeT) * (1 - back) + 0.05 * wind * back;
-      open += u < 0.5 ? wind * 1.1 : Math.max(0, 1.1 - (u - 0.5) * 14);
+      const shut = u < 0.48 ? 0 : smooth(clamp((u - 0.48) * 14, 0, 1)) * (1 - smooth(clamp((u - 0.72) * 4, 0, 1)));
+      open += (u < 0.48 ? wind * 0.65 : 0) - shut * (GIB_REST - 0.03);
       o.rx = -0.25 * wind * (1 - lungeT) + 0.3 * lungeT * (1 - back);
       o.y += lungeT * (1 - back) * 0.06;
     }
@@ -1396,7 +1393,7 @@ function poseGible(p, o) {
     P.legs.forEach((l) => { l.position.z = 0.02; l.rotation.x = 0; });
     if (o.sleepy && !k && !o.walking) { open += 0.08; o.rx = 0.06 + Math.sin(p.age * 1.4) * 0.03; }
   }
-  P.jaw.rotation.x = open;
+  P.jaw.rotation.x = clamp(open, 0.03, 1.2);
   P.tail.rotation.y = wag;
   P.head.rotation.y = p.headYaw * 0.6;
   P.head.position.y = GIB_BODY_Y + o.breathe * 1.2;
