@@ -66,6 +66,18 @@ body.room-page {
 }
 .room-page .nav a:hover { background: var(--amber); color: #2b2640; }
 .room-page .nav a.on { background: var(--hud-ink); color: #2b2640; }
+.room-page .view-reset {
+  font-size: 8px;
+  color: #2b2640;
+  background: var(--amber);
+  border: 3px solid #2b2640;
+  border-radius: 6px;
+  padding: 9px 10px 8px;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #2b2640;
+}
+.room-page .view-reset:hover { background: var(--hud-ink); }
+.room-page .view-reset[hidden] { display: none; }
 .room-page .mode {
   margin-left: auto;
   border-color: var(--hud-ink);
