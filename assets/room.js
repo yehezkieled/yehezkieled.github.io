@@ -9,6 +9,11 @@
     red handheld on desk  -> posts
     phone on nightstand   -> online
   Plush creatures and the shelf balls are decorative and react when clicked.
+  Piplup and Gible wander the floor, keep clear of the furniture, and hop,
+  turn to the camera and say a line when clicked.
+
+  Looking around: drag orbits, right-drag / shift-drag / two-finger drag pans,
+  wheel or pinch zooms, arrow keys and +/- do the same, 0 resets the view.
 */
 import * as THREE from "../vendor/three/three.module.min.js";
 
@@ -47,6 +52,7 @@ const STEPS = [
   "Moving the furniture in",
   "Plugging in the PC and TV",
   "Tucking in the plushies",
+  "Waking up Piplup and Gible",
   "Turning on the lights",
   "Tuning the picture",
 ];
@@ -227,6 +233,65 @@ function buildTextures() {
     ctx.fillStyle = "#244a52";
     for (let y = 0; y < 16; y += 4) for (let x = 0; x < 16; x += 4) ctx.fillRect(x + (y / 4) % 2, y, 1, 1);
   }, [4, 3]);
+
+  buildPetTextures();
+}
+
+/*
+  Pet skins are painted for a SphereGeometry: canvas x runs around the body
+  (x = 16 of 64 is the front, 48 the back), canvas y runs top to bottom.
+*/
+const PIP = { light: "#62b5ec", dark: "#2457a8", eye: "#1a2550", beak: "#f4c542" };
+const GIB = { blue: "#4a78d0", navy: "#2f4f9e", belly: "#e94b3c", mouth: "#7a1f2b", eye: "#ffd24d" };
+
+function buildPetTextures() {
+  TEX.pipBody = makeTex(64, 32, (ctx) => {
+    ctx.fillStyle = PIP.light; ctx.fillRect(0, 0, 64, 32);
+    ctx.fillStyle = PIP.dark;
+    ctx.fillRect(0, 0, 64, 6);        // shoulders
+    ctx.fillRect(30, 0, 36, 18);      // cape over the back
+    ctx.fillStyle = "#fff8ee";
+    ctx.beginPath(); ctx.ellipse(16, 21, 9, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(10, 8, 4, 4); ctx.fillRect(18, 8, 4, 4);   // two chest spots
+  });
+  const pipHead = (blink) => makeTex(64, 32, (ctx) => {
+    ctx.fillStyle = PIP.light; ctx.fillRect(0, 0, 64, 32);
+    ctx.fillStyle = PIP.dark;
+    ctx.fillRect(0, 0, 64, 9);        // cape over the crown
+    ctx.fillRect(34, 9, 28, 10);      // and down the back of the head
+    ctx.fillRect(38, 19, 5, 6); ctx.fillRect(53, 19, 5, 6);   // two cape tails
+    ctx.fillStyle = "#fff8ee";
+    ctx.fillRect(7, 13, 6, 8); ctx.fillRect(19, 13, 6, 8);   // face patches
+    ctx.fillStyle = PIP.eye;
+    if (blink) { ctx.fillRect(8, 17, 4, 1); ctx.fillRect(20, 17, 4, 1); }
+    else {
+      ctx.fillRect(8, 14, 4, 6); ctx.fillRect(20, 14, 4, 6);
+      ctx.fillStyle = "#fff8ee"; ctx.fillRect(9, 15, 1, 1); ctx.fillRect(21, 15, 1, 1);
+    }
+  });
+  TEX.pipHead = pipHead(false);
+  TEX.pipHeadBlink = pipHead(true);
+
+  const gibTop = (blink) => makeTex(64, 32, (ctx) => {
+    ctx.fillStyle = GIB.blue; ctx.fillRect(0, 0, 64, 32);
+    ctx.fillStyle = GIB.navy;
+    ctx.fillRect(0, 0, 64, 5);        // darker crown
+    ctx.fillStyle = GIB.eye;
+    if (blink) { ctx.fillRect(5, 22, 6, 1); ctx.fillRect(21, 22, 6, 1); }
+    else {
+      ctx.fillRect(5, 19, 6, 7); ctx.fillRect(21, 19, 6, 7);
+      ctx.fillStyle = "#1a1a1a"; ctx.fillRect(7, 21, 3, 4); ctx.fillRect(22, 21, 3, 4);
+    }
+  });
+  TEX.gibTop = gibTop(false);
+  TEX.gibTopBlink = gibTop(true);
+  TEX.gibJaw = makeTex(64, 32, (ctx) => {
+    ctx.fillStyle = GIB.blue; ctx.fillRect(0, 0, 64, 32);
+    ctx.fillStyle = GIB.belly;
+    ctx.fillRect(5, 0, 22, 26);       // red belly under the mouth
+    ctx.fillStyle = GIB.navy;
+    ctx.fillRect(0, 26, 64, 6);       // dark underside
+  });
 }
 
 function screenTex(lines, accent, bg) {
@@ -302,6 +367,16 @@ function buildMaterials() {
   MAT.dex = new THREE.MeshBasicMaterial({ map: TEX.dex });
   MAT.poster = mat("#ffffff", { map: TEX.poster });
   MAT.felt = mat("#ffffff", { map: TEX.caseFelt });
+  MAT.pipBody = mat("#ffffff", { map: TEX.pipBody });
+  MAT.pipHead = mat("#ffffff", { map: TEX.pipHead });
+  MAT.pipDark = mat(PIP.dark);
+  MAT.pipLight = mat(PIP.light);
+  MAT.beak = mat(PIP.beak);
+  MAT.gibTop = mat("#ffffff", { map: TEX.gibTop });
+  MAT.gibJaw = mat("#ffffff", { map: TEX.gibJaw });
+  MAT.gibBlue = mat(GIB.blue);
+  MAT.gibNavy = mat(GIB.navy);
+  MAT.gibMouth = mat(GIB.mouth);
 }
 
 function buildRoom() {
@@ -579,6 +654,258 @@ function buildPlushies() {
   toys.push({ group: ember, kind: "plush", line: "Ember: ...zzz", baseY: 0.73, t: 0 });
 }
 
+/* ------------------------------------------------------------------ */
+/* Pets: Piplup and Gible live on the floor                            */
+/* ------------------------------------------------------------------ */
+const pets = [];
+const FLOOR_EDGE = 2.72;
+// floor footprints of the furniture: [x1, z1, x2, z2]
+const OBSTACLES = [
+  [-2.7, -3.0, -1.1, -0.78],  // bed
+  [-3.0, -0.65, -2.35, -0.05], // nightstand
+  [-3.0, 0.3, -2.2, 1.9],      // TV stand
+  [0.75, -3.0, 2.65, -2.1],    // desk
+  [0.88, -2.22, 1.42, -1.68],  // chair
+  [-2.75, 2.05, -2.15, 2.65],  // plant
+];
+
+function floorClear(x, z, r) {
+  if (Math.abs(x) > FLOOR_EDGE - r || Math.abs(z) > FLOOR_EDGE - r) return false;
+  for (const [x1, z1, x2, z2] of OBSTACLES) {
+    if (x > x1 - r && x < x2 + r && z > z1 - r && z < z2 + r) return false;
+  }
+  return true;
+}
+function pathClear(ax, az, bx, bz, r) {
+  const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.08));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    if (!floorClear(ax + (bx - ax) * t, az + (bz - az) * t, r)) return false;
+  }
+  return true;
+}
+
+function hemisphere(r, material, top) {
+  const geo = new THREE.SphereGeometry(r, 14, 7, 0, Math.PI * 2, top ? 0 : Math.PI / 2, Math.PI / 2);
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function halfCyl(r, h, material, front) {
+  const geo = new THREE.CylinderGeometry(r, r, h, 12, 1, false, front ? -Math.PI / 2 : Math.PI / 2, Math.PI);
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = true;
+  return m;
+}
+
+function buildPets() {
+  // Piplup: light blue, dark cape, yellow beak and feet. Faces +z.
+  const pip = new THREE.Group();
+  const pipBody = ball(0.135, MAT.pipBody, 0, 0.155, 0, 14);
+  pipBody.scale.set(1, 1.1, 0.95);
+  pip.add(pipBody);
+  const pipHead = new THREE.Group();
+  pipHead.position.set(0, 0.345, 0);
+  const pipFace = ball(0.115, MAT.pipHead, 0, 0, 0, 14);
+  pipHead.add(pipFace);
+  const beak = cyl(0, 0.035, 0.07, MAT.beak, 0, -0.015, 0.13, 6);
+  beak.rotation.x = Math.PI / 2;
+  pipHead.add(beak);
+  pipHead.add(cyl(0, 0.03, 0.05, MAT.pipLight, 0, 0.125, 0.02, 5));
+  pip.add(pipHead);
+  const flippers = [-1, 1].map((s) => {
+    const f = new THREE.Group();
+    f.position.set(s * 0.13, 0.22, 0);
+    f.add(box(0.035, 0.16, 0.07, MAT.pipDark, 0, -0.07, 0));
+    pip.add(f);
+    return f;
+  });
+  const pipFeet = [-1, 1].map((s) => {
+    const foot = box(0.07, 0.03, 0.11, MAT.beak, s * 0.05, 0.015, 0.03);
+    pip.add(foot);
+    return foot;
+  });
+  addPet({
+    name: "Piplup", group: pip, x: 0.9, z: 0.9, yaw: 0.9, speed: 0.32, gait: "waddle",
+    lines: ["Piplup: pip-lup!", "Piplup: *puffs out its chest*", "Piplup: lup lup!"],
+    parts: { body: pipBody, head: pipHead, face: pipFace, flippers, feet: pipFeet },
+    maps: [TEX.pipHead, TEX.pipHeadBlink],
+  });
+
+  // Gible: a round blue mouth on legs with a fin. Faces +z.
+  const gib = new THREE.Group();
+  const mouth = new THREE.Group();
+  mouth.position.set(0, 0.19, 0);
+  const gibTop = hemisphere(0.16, MAT.gibTop, true);
+  gibTop.position.y = 0.02;
+  const gibJaw = hemisphere(0.16, MAT.gibJaw, false);
+  gibJaw.position.y = -0.02;
+  const gibMouth = halfCyl(0.155, 0.04, MAT.gibMouth, true);
+  const gibBack = halfCyl(0.16, 0.04, MAT.gibBlue, false);
+  mouth.add(gibTop, gibJaw, gibMouth, gibBack);
+  const teeth = [];
+  [-0.9, -0.45, 0, 0.45, 0.9].forEach((a) => {
+    const t = cyl(0, 0.012, 0.03, MAT.cream, Math.sin(a) * 0.158, 0.012, Math.cos(a) * 0.158, 4);
+    t.rotation.x = Math.PI;
+    mouth.add(t);
+    teeth.push(t);
+  });
+  gib.add(mouth);
+  const fin = cyl(0, 0.09, 0.17, MAT.gibNavy, 0, 0.42, -0.03, 3);
+  fin.scale.x = 0.3;
+  fin.rotation.x = -0.25;
+  gib.add(fin);
+  [-1, 1].forEach((s) => {
+    const jet = box(0.07, 0.06, 0.15, MAT.gibNavy, s * 0.175, 0.2, -0.05);
+    jet.rotation.y = s * 0.2;
+    gib.add(jet);
+  });
+  const tail = cyl(0, 0.05, 0.12, MAT.gibNavy, 0, 0.15, -0.21, 3);
+  tail.scale.x = 0.35;
+  tail.rotation.x = -Math.PI / 2;
+  gib.add(tail);
+  const gibFeet = [-1, 1].map((s) => {
+    const foot = box(0.07, 0.04, 0.09, MAT.gibNavy, s * 0.08, 0.02, 0.02);
+    gib.add(foot);
+    return foot;
+  });
+  addPet({
+    name: "Gible", group: gib, x: 1.9, z: 1.6, yaw: -0.6, speed: 0.4, gait: "hop",
+    lines: ["Gible: gib gib!", "Gible: *chomp chomp*", "Gible: gib!"],
+    parts: { mouth, top: gibTop, jaw: gibJaw, slab: gibMouth, back: gibBack, teeth, feet: gibFeet, face: gibTop },
+    maps: [TEX.gibTop, TEX.gibTopBlink],
+  });
+}
+
+function addPet(o) {
+  const p = {
+    name: o.name, group: o.group, lines: o.lines, parts: o.parts, maps: o.maps,
+    speed: o.speed, gait: o.gait, radius: 0.22,
+    state: "idle", timer: 1 + Math.random() * 2,
+    yaw: o.yaw, yawGoal: o.yaw, headYaw: 0, headGoal: 0, nextLook: 2 + Math.random() * 3,
+    x: o.x, z: o.z, from: [o.x, o.z], to: [o.x, o.z], walkT: 0, walkLen: 0,
+    age: Math.random() * 10, react: 0, blink: 0, nextBlink: 2 + Math.random() * 4, chomp: 0, nextChomp: 3 + Math.random() * 5,
+    said: 0,
+  };
+  p.group.position.set(p.x, 0.02, p.z);
+  p.group.rotation.y = p.yaw;
+  p.group.userData.pet = true;
+  scene.add(p.group);
+  pets.push(p);
+}
+
+function pickWalk(p) {
+  const other = pets.find((q) => q !== p);
+  for (let i = 0; i < 24; i++) {
+    const reach = 0.6 + Math.random() * 1.6;
+    const a = Math.random() * Math.PI * 2;
+    const x = p.x + Math.cos(a) * reach, z = p.z + Math.sin(a) * reach;
+    if (!floorClear(x, z, p.radius)) continue;
+    if (other && Math.hypot(other.x - x, other.z - z) < 0.6) continue;
+    if (!pathClear(p.x, p.z, x, z, p.radius)) continue;
+    p.from = [p.x, p.z]; p.to = [x, z];
+    p.walkLen = Math.hypot(x - p.x, z - p.z); p.walkT = 0;
+    p.state = "walk";
+    p.yawGoal = Math.atan2(x - p.x, z - p.z);
+    p.headGoal = 0;
+    return;
+  }
+  p.timer = 1 + Math.random() * 2;
+}
+
+function faceCamera(p) {
+  p.yawGoal = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
+  p.headGoal = 0;
+}
+
+function turnToward(cur, goal, k) {
+  let d = ((goal - cur + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return cur + d * Math.min(1, k);
+}
+
+function stepPets(dt) {
+  for (const p of pets) {
+    const P = p.parts;
+    if (p.react > 0) p.react = Math.max(0, p.react - dt * 1.3);
+
+    if (!REDUCED && p.react === 0) {
+      if (p.state === "idle") {
+        p.timer -= dt;
+        if (p.timer <= 0) pickWalk(p);
+      } else if (p.state === "walk") {
+        p.walkT += (dt * p.speed) / Math.max(0.05, p.walkLen);
+        const t = Math.min(1, p.walkT);
+        p.x = p.from[0] + (p.to[0] - p.from[0]) * t;
+        p.z = p.from[1] + (p.to[1] - p.from[1]) * t;
+        if (t >= 1) { p.state = "idle"; p.timer = 1.5 + Math.random() * 3; }
+      }
+      p.nextLook -= dt;
+      if (p.nextLook <= 0) {
+        p.nextLook = 2 + Math.random() * 4;
+        if (p.state === "idle") {
+          if (Math.random() < 0.4) faceCamera(p);
+          else p.headGoal = (Math.random() - 0.5) * 1.2;
+        }
+      }
+      p.nextBlink -= dt;
+      if (p.nextBlink <= 0) { p.nextBlink = 2 + Math.random() * 4; p.blink = 0.14; }
+      if (p.gait === "hop" && p.state === "idle") {
+        p.nextChomp -= dt;
+        if (p.nextChomp <= 0) { p.nextChomp = 3 + Math.random() * 5; p.chomp = 1; }
+      }
+    }
+    if (p.blink > 0) p.blink = Math.max(0, p.blink - dt);
+    if (p.chomp > 0) p.chomp = Math.max(0, p.chomp - dt * 1.6);
+    P.face.material.map = p.blink > 0 ? p.maps[1] : p.maps[0];
+
+    const snap = REDUCED ? 1 : dt * 7;
+    p.yaw = turnToward(p.yaw, p.yawGoal, snap);
+    p.headYaw = turnToward(p.headYaw, p.headGoal, snap);
+    if (!REDUCED) p.age += dt;
+
+    const walking = p.state === "walk" && !REDUCED;
+    const b = Math.sin((1 - p.react) * Math.PI) * (p.react > 0 ? 1 : 0); // reaction hop curve
+    const breathe = REDUCED ? 0 : Math.sin(p.age * 2.5) * 0.015;
+    let y = 0.02, rz = 0, rx = 0;
+    if (p.gait === "waddle") {
+      const g = walking ? p.age * 14 : 0;
+      rz = Math.sin(g) * 0.12;
+      y += Math.abs(Math.sin(g)) * 0.015;
+      P.flippers.forEach((f, i) => {
+        const s = i ? 1 : -1;
+        f.rotation.z = s * (0.25 + (walking ? Math.sin(g + i * Math.PI) * 0.25 : 0) + b * 1.2);
+      });
+      P.feet.forEach((f, i) => { f.position.y = 0.015 + (walking ? Math.max(0, Math.sin(g + i * Math.PI)) * 0.03 : 0); });
+      P.head.rotation.y = p.headYaw;
+      P.head.position.y = 0.345 + breathe * 2;
+    } else {
+      const g = walking ? p.age * 8 : 0;
+      y += walking ? Math.max(0, Math.sin(g)) * 0.09 : 0;
+      rx = walking ? Math.sin(g) * 0.12 : 0;
+      const open = Math.max(p.chomp > 0 ? Math.sin(p.chomp * Math.PI) : 0, b);
+      P.top.position.y = 0.02 + open * 0.035;
+      P.jaw.position.y = -0.02 - open * 0.035;
+      P.slab.scale.y = P.back.scale.y = 1 + open * 1.75;
+      P.teeth.forEach((t) => { t.position.y = 0.012 + open * 0.035; });
+      P.mouth.rotation.y = p.headYaw * 0.5;
+      P.feet.forEach((f, i) => { f.position.y = 0.02 + (walking ? Math.max(0, Math.sin(g + i * Math.PI)) * 0.02 : 0); });
+    }
+    y += b * 0.22;
+    p.group.position.set(p.x, y, p.z);
+    p.group.rotation.set(rx, p.yaw, rz);
+    p.group.scale.set(1 - b * 0.1, 1 + b * 0.15 + breathe, 1 - b * 0.1);
+  }
+}
+
+function pokePet(p) {
+  p.react = REDUCED ? 0 : 1;
+  p.state = "idle";
+  p.timer = 2 + Math.random() * 2;
+  if (p.gait === "hop" && !REDUCED) p.chomp = 1;
+  faceCamera(p);
+  say(p.lines[p.said++ % p.lines.length]);
+}
+
 function buildLights() {
   scene.add(new THREE.AmbientLight("#c7c2ff", NIGHT ? 0.55 : 0.8));
   const hemi = new THREE.HemisphereLight("#9aa0e0", "#5a3a2a", NIGHT ? 0.5 : 0.7);
@@ -659,11 +986,88 @@ function setGoal(pos, target, shift) {
     cam.pos.copy(cam.goalPos);
     cam.target.copy(cam.goalTarget);
   }
+  markMoved(false);
 }
 
 function goHome() {
   const h = homePose();
   setGoal(h.pos, h.target);
+}
+
+function frameSpot(spot) {
+  const target = new THREE.Vector3(...spot.pose.target);
+  const pos = new THREE.Vector3(...spot.pose.pos);
+  const scale = Math.max(1, Math.pow(1.45 / camera.aspect, 0.9));
+  pos.sub(target).multiplyScalar(scale).add(target);
+  setGoal(pos, target, panelShift());
+}
+
+/* ------------------------------------------------------------------ */
+/* Free look: orbit, pan and zoom around the current view              */
+/* ------------------------------------------------------------------ */
+const UP = new THREE.Vector3(0, 1, 0);
+const VIEW = {
+  theta: [-0.4, 1.95],   // azimuth, 0 looks along -z at the back wall; stays on the open side
+  phi: [0.08, 1.3],      // elevation above the floor
+  dist: [1.6, 12],
+  wall: -2.8,            // the walls stand at x = -3 and z = -3
+  top: 5.8,
+  box: { x: [-2.5, 2.5], y: [0.15, 2.5], z: [-2.5, 2.5] },
+};
+const viewReset = $("view-reset");
+let viewMoved = false;
+let gesture = null;         // active drag: { mode: orbit | pan | pinch, ... }
+const pointers = new Map(); // pointerId -> { x, y }
+
+function markMoved(on) {
+  viewMoved = on;
+  viewReset.hidden = !on;
+}
+function orbitOf(pos, target) {
+  const d = pos.clone().sub(target);
+  const dist = Math.max(1e-4, d.length());
+  return { dist, phi: Math.asin(THREE.MathUtils.clamp(d.y / dist, -1, 1)), theta: Math.atan2(d.x, d.z) };
+}
+function dirOf(theta, phi) {
+  return new THREE.Vector3(Math.cos(phi) * Math.sin(theta), Math.sin(phi), Math.cos(phi) * Math.cos(theta));
+}
+const clamp = THREE.MathUtils.clamp;
+
+// n: { dTheta, dPhi, zoom, panX, panY } (angles in radians, pan in CSS pixels)
+function nudgeView(n) {
+  const o = orbitOf(cam.goalPos, cam.goalTarget);
+  const t = cam.goalTarget.clone();
+  if (n.panX || n.panY) {
+    const look = dirOf(o.theta, o.phi).negate();
+    const right = new THREE.Vector3().crossVectors(look, UP).normalize();
+    const up = new THREE.Vector3().crossVectors(right, look).normalize();
+    const k = o.dist * 0.0011;
+    t.addScaledVector(right, -(n.panX || 0) * k).addScaledVector(up, (n.panY || 0) * k);
+    t.x = clamp(t.x, VIEW.box.x[0], VIEW.box.x[1]);
+    t.y = clamp(t.y, VIEW.box.y[0], VIEW.box.y[1]);
+    t.z = clamp(t.z, VIEW.box.z[0], VIEW.box.z[1]);
+  }
+  o.theta = clamp(o.theta + (n.dTheta || 0), VIEW.theta[0], VIEW.theta[1]);
+  o.phi = clamp(o.phi + (n.dPhi || 0), VIEW.phi[0], VIEW.phi[1]);
+  o.dist = clamp(o.dist * (n.zoom || 1), VIEW.dist[0], VIEW.dist[1]);
+  const dir = dirOf(o.theta, o.phi);
+  // never go through the walls or above the room
+  if (dir.x < -1e-4) o.dist = Math.min(o.dist, (t.x - VIEW.wall) / -dir.x);
+  if (dir.z < -1e-4) o.dist = Math.min(o.dist, (t.z - VIEW.wall) / -dir.z);
+  if (dir.y > 1e-4) o.dist = Math.min(o.dist, (VIEW.top - t.y) / dir.y);
+  o.dist = Math.max(o.dist, 0.5);
+  cam.goalTarget.copy(t);
+  cam.goalPos.copy(t).addScaledVector(dir, o.dist);
+  if (REDUCED) {
+    cam.pos.copy(cam.goalPos);
+    cam.target.copy(cam.goalTarget);
+  }
+  markMoved(true);
+}
+
+function resetView() {
+  const spot = current && hotspots.find((h) => h.key === current);
+  if (spot) frameSpot(spot); else goHome();
 }
 
 /* ------------------------------------------------------------------ */
@@ -679,11 +1083,7 @@ function open(key, opts) {
   requestAnimationFrame(() => panel.classList.add("open"));
   panel.scrollTop = 0;
   navLinks.forEach((a) => a.classList.toggle("on", a.dataset.go === key));
-  const target = new THREE.Vector3(...spot.pose.target);
-  const pos = new THREE.Vector3(...spot.pose.pos);
-  const scale = Math.max(1, Math.pow(1.45 / camera.aspect, 0.9));
-  pos.sub(target).multiplyScalar(scale).add(target);
-  setGoal(pos, target, panelShift());
+  frameSpot(spot);
   if (!opts || !opts.fromHash) history.replaceState(null, "", "#" + key);
   announce.textContent = "Opened " + spot.label + ": " + spot.title;
   if (!opts || opts.focus !== false) panel.focus({ preventScroll: true });
@@ -728,6 +1128,8 @@ function pick(clientX, clientY) {
       if (o.userData.key) return { kind: "spot", key: o.userData.key, point: h.point };
       const toy = toys.find((t) => t.group === o);
       if (toy) return { kind: "toy", toy, point: h.point };
+      const pet = pets.find((p) => p.group === o);
+      if (pet) return { kind: "pet", pet, point: h.point };
       o = o.parent;
     }
     return null; // first hit is something inert (wall, floor, furniture)
@@ -760,8 +1162,8 @@ function tint(group, on) {
   });
 }
 
-function showHint(x, y, spot) {
-  hint.innerHTML = PA.esc(spot.label) + "<small>" + PA.esc(spot.title) + " · click</small>";
+function showHint(x, y, label, sub) {
+  hint.innerHTML = PA.esc(label) + "<small>" + PA.esc(sub) + " · click</small>";
   const pad = 16;
   const w = hint.offsetWidth, h = hint.offsetHeight;
   const px = Math.min(x + pad, window.innerWidth - w - 8);
@@ -771,6 +1173,7 @@ function showHint(x, y, spot) {
 function hideHint() { hint.style.transform = "translate(-9999px,-9999px)"; }
 
 function onMove(e) {
+  if (onGesture(e)) return;
   if (e.pointerType === "touch") return;
   const W = window.innerWidth, H = window.innerHeight;
   parallax.x = (e.clientX / W - 0.5) * 2;
@@ -780,47 +1183,125 @@ function onMove(e) {
   if (hit && hit.kind === "spot") {
     const spot = hotspots.find((h) => h.key === hit.key);
     setHover(spot);
-    showHint(e.clientX, e.clientY, spot);
+    showHint(e.clientX, e.clientY, spot.label, spot.title);
   } else {
     setHover(null);
-    hideHint();
-    renderer.domElement.style.cursor = hit && hit.kind === "toy" ? "pointer" : "";
+    if (hit && hit.kind === "pet") showHint(e.clientX, e.clientY, hit.pet.name, "say hi");
+    else hideHint();
+    renderer.domElement.style.cursor = hit ? "pointer" : "";
   }
 }
 
-function onDown(e) { pressAt = { x: e.clientX, y: e.clientY, t: performance.now() }; }
+function pinchFrom() {
+  const [a, b] = Array.from(pointers.values());
+  return { mode: "pinch", span: Math.hypot(b.x - a.x, b.y - a.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, dragged: true };
+}
+
+function onDown(e) {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (_) { /* not supported */ }
+  if (pointers.size === 1) {
+    pressAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+    gesture = { mode: e.button === 2 || e.shiftKey ? "pan" : "orbit", x: e.clientX, y: e.clientY, dragged: false };
+  } else {
+    pressAt = null;
+    gesture = pinchFrom();
+  }
+}
+
+// Returns true while the pointer belongs to a drag, pinch or pan.
+function onGesture(e) {
+  const p = pointers.get(e.pointerId);
+  if (!p || !gesture) return false;
+  p.x = e.clientX; p.y = e.clientY;
+  if (gesture.mode === "pinch") {
+    if (pointers.size < 2) return true;
+    const n = pinchFrom();
+    nudgeView({ zoom: gesture.span / Math.max(1, n.span), panX: n.mx - gesture.mx, panY: n.my - gesture.my });
+    gesture.span = n.span; gesture.mx = n.mx; gesture.my = n.my;
+    return true;
+  }
+  const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+  if (!gesture.dragged) {
+    if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) < 6) return true;
+    gesture.dragged = true;
+    setHover(null);
+    hideHint();
+  }
+  gesture.x = e.clientX; gesture.y = e.clientY;
+  if (gesture.mode === "pan") nudgeView({ panX: dx, panY: dy });
+  else nudgeView({ dTheta: -dx * 0.0045, dPhi: dy * 0.0045 });
+  return true;
+}
+
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) gesture = null;
+  else if (pointers.size === 1) {
+    const p = pointers.values().next().value;
+    gesture = { mode: "orbit", x: p.x, y: p.y, dragged: true };
+  } else gesture = pinchFrom();
+}
+
 function onUp(e) {
+  const wasDrag = gesture && gesture.dragged;
+  endPointer(e);
   if (!pressAt) return;
   const moved = Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y);
   const dt = performance.now() - pressAt.t;
   pressAt = null;
-  if (moved > 8 || dt > 600) return;
+  if (wasDrag || pointers.size || moved > 8 || dt > 600) return;
   const hit = pick(e.clientX, e.clientY);
   if (hit && hit.kind === "spot") open(hit.key);
   else if (hit && hit.kind === "toy") poke(hit.toy);
+  else if (hit && hit.kind === "pet") pokePet(hit.pet);
   else if (current) close();
 }
 
+function onCancel(e) {
+  endPointer(e);
+  pressAt = null;
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+  // trackpad pinch arrives as a ctrl+wheel with small deltas
+  nudgeView({ zoom: Math.exp(e.deltaY * unit * (e.ctrlKey ? 0.01 : 0.0012)) });
+}
+
 let toastTimer = 0;
+function say(text, ms) {
+  toast.textContent = text;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), ms || 1600);
+}
 function poke(toy) {
   toy.t = 1;
-  if (toy.kind === "plush") {
-    toast.textContent = toy.line;
-    toast.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
-  }
+  if (toy.kind === "plush") say(toy.line);
 }
 
 /* ------------------------------------------------------------------ */
 /* Keyboard                                                            */
 /* ------------------------------------------------------------------ */
+const VIEW_KEYS = {
+  ArrowLeft: { dTheta: 0.12 }, ArrowRight: { dTheta: -0.12 },
+  ArrowUp: { dPhi: 0.08 }, ArrowDown: { dPhi: -0.08 },
+  "+": { zoom: 0.85 }, "=": { zoom: 0.85 }, "-": { zoom: 1 / 0.85 }, "_": { zoom: 1 / 0.85 },
+};
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && current) { close(); e.preventDefault(); return; }
   if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!panel.contains(e.target)) {
+    if (VIEW_KEYS[e.key]) { nudgeView(VIEW_KEYS[e.key]); e.preventDefault(); return; }
+    if (e.key === "0" || e.key === "Home") { resetView(); e.preventDefault(); return; }
+  }
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= PA.order.length && !e.metaKey && !e.ctrlKey && !e.altKey) open(PA.order[n - 1]);
+  if (n >= 1 && n <= PA.order.length) open(PA.order[n - 1]);
 });
+viewReset.addEventListener("click", () => resetView());
 
 navLinks.forEach((a) => {
   a.addEventListener("click", (e) => {
@@ -844,7 +1325,8 @@ function frame(now) {
 }
 function step(dt) {
 
-  const k = REDUCED ? 1 : 1 - Math.pow(0.0025, dt); // smooth exponential approach
+  // smooth exponential approach; much tighter while a finger or mouse is dragging
+  const k = REDUCED ? 1 : 1 - Math.pow(gesture ? 1e-7 : 0.0025, dt);
   cam.pos.lerp(cam.goalPos, k);
   cam.target.lerp(cam.goalTarget, k);
   camera.position.copy(cam.pos);
@@ -867,6 +1349,7 @@ function step(dt) {
       }
     }
   }
+  stepPets(dt);
 
   renderer.render(scene, camera);
 }
@@ -876,7 +1359,8 @@ function resize() {
   camera.aspect = W / H;
   camera.updateProjectionMatrix();
   renderer.setSize(Math.floor(W * RENDER_SCALE), Math.floor(H * RENDER_SCALE), false);
-  if (!current) goHome();
+  if (viewMoved) nudgeView({});
+  else if (!current) goHome();
   else open(current, { fromHash: true, focus: false });
 }
 
@@ -908,6 +1392,8 @@ async function boot() {
     await progress();
     buildPlushies();
     await progress();
+    buildPets();
+    await progress();
     buildLights();
     await progress();
 
@@ -915,17 +1401,25 @@ async function boot() {
     cam.pos.copy(cam.goalPos);
     cam.target.copy(cam.goalTarget);
     window.addEventListener("resize", resize);
-    renderer.domElement.addEventListener("pointermove", onMove);
-    renderer.domElement.addEventListener("pointerdown", onDown);
-    renderer.domElement.addEventListener("pointerup", onUp);
-    renderer.domElement.addEventListener("pointerleave", () => { setHover(null); hideHint(); });
+    const el = renderer.domElement;
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onCancel);
+    el.addEventListener("pointerleave", () => { setHover(null); hideHint(); });
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
 
     renderer.render(scene, camera);
     await progress("Ready");
     requestAnimationFrame(frame);
 
     applyHash();
-    const hide = () => { loader.classList.add("hide"); setTimeout(() => { loader.hidden = true; }, REDUCED ? 0 : 420); };
+    const hide = () => {
+      loader.classList.add("hide");
+      setTimeout(() => { loader.hidden = true; }, REDUCED ? 0 : 420);
+      if (!current) say("Drag to look around · scroll or pinch to zoom", 3200);
+    };
     if (REDUCED) hide(); else setTimeout(hide, 380);
     window.PA_READY = true;
   } catch (err) {

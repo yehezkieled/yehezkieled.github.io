@@ -7,7 +7,7 @@ Two versions of the same content:
 
 | Version | URL | What it is |
 | --- | --- | --- |
-| Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. |
+| Room | `/` | A small 3D trainer's bedroom (three.js). Click the PC, badge case, TV, red handheld or phone to open a section. Drag to look around, scroll or pinch to zoom, press 0 or "Reset view" to go back. Piplup and Gible wander the floor and say hi when clicked. |
 | Plain | `/plain/` | Static, text-first page with the same sections. Light/dark theme. |
 
 Viewports narrower than 640 pixels, data-saver connections, devices reporting 2 GB of memory or less, and browsers without hardware WebGL 2 are sent to the plain version automatically. On `/`, `?room=1` forces Room, `?plain=1` forces Plain, and `?auto=1` resets the choice and detects again. Explicit queries take precedence over saved preferences; choices are remembered when browser storage is available.
@@ -38,4 +38,4 @@ All models, textures and icons are hand-made for this site. It is an unofficial 
 
 ![Room tour](docs/preview/room-tour.gif)
 
-More in [`docs/preview/`](docs/preview/): a 19-second [MP4 tour](docs/preview/room-tour.mp4) and screenshots at desktop, iPad and phone widths.
+More in [`docs/preview/`](docs/preview/): a 19-second [MP4 tour](docs/preview/room-tour.mp4), a 16-second [tour of Piplup, Gible and the camera controls](docs/preview/pets-tour.mp4) (also as [GIF](docs/preview/pets-tour.gif)), and screenshots at desktop, iPad and phone widths.
