@@ -755,7 +755,7 @@ function buildPiplup() {
   g.add(head);
 
   const flipperProfile = [[0, 0], [0.55, 0.12], [0.9, 0.38], [1, 0.58], [0.75, 0.82], [0.3, 0.96], [0, 1]]
-    .map(([x, y]) => [x * 0.05, -y * 0.19]);
+    .map(([x, y]) => [x * 0.05, -y * 0.19]).reverse();
   const flippers = [-1, 1].map((s) => {
     const f = new THREE.Group();
     f.position.set(s * 0.125, 0.255, 0.01);
@@ -1198,23 +1198,25 @@ function moveLift(clientX, clientY) {
   lift.z = clamp(liftPoint.z, -edge, edge);
 }
 // nearest clear floor spot to (x, z), searching outward in rings
-function landingSpot(x, z, r) {
-  if (floorClear(x, z, r)) return [x, z];
+function landingSpot(x, z, p) {
+  const clear = (nx, nz) => floorClear(nx, nz, p.radius) && pets.every((q) =>
+    q === p || Math.hypot(q.x - nx, q.z - nz) >= p.radius + q.radius);
+  if (clear(x, z)) return [x, z];
   for (let d = 0.12; d < 6; d += 0.12) {
     for (let i = 0; i < 20; i++) {
       const a = (i / 20) * Math.PI * 2;
       const nx = x + Math.cos(a) * d, nz = z + Math.sin(a) * d;
-      if (floorClear(nx, nz, r)) return [nx, nz];
+      if (clear(nx, nz)) return [nx, nz];
     }
   }
-  return [0.9, 0.9];
+  throw new Error("No clear pet landing spot");
 }
 function dropPet() {
   if (!lift) return;
   const p = lift.pet;
   lift = null;
   p.held = false;
-  const [x, z] = landingSpot(p.x, p.z, p.radius);
+  const [x, z] = landingSpot(p.x, p.z, p);
   if (REDUCED) {
     p.x = x; p.z = z;
     say(p.lines.land);
