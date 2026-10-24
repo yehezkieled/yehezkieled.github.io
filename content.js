@@ -1,6 +1,6 @@
 /*
-  Site content. Edit this file to change any text on the site.
-  Both the room (3D) page and the plain page read from it.
+  Shared portfolio content for the room and plain pages.
+  See README.md#editing-content for the editing and regeneration workflow.
 
   Rules of thumb:
   - Keep `repo` null for private repositories (no link is rendered).

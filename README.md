@@ -14,14 +14,14 @@ Phones, data-saver, low-memory devices and browsers without hardware WebGL 2 are
 
 ## Editing content
 
-All text lives in [`content.js`](content.js). Edit it, run `node scripts/render-plain.mjs`, and commit both the content and updated `plain/index.html`. The command uses the shared section renderer to keep the delivered no-JavaScript page in sync. Edit `plain/template.html` for layout changes; `plain/index.html` is generated.
+Profile, section headings, projects, posts and links live in [`content.js`](content.js). After editing it, the shared renderer (`assets/sections.js`) or `plain/template.html`, run `node scripts/render-plain.mjs` with Node.js and commit the source changes and updated `plain/index.html`. The command uses the shared section renderer to keep the delivered no-JavaScript page in sync. Edit `plain/template.html` for Plain page layout and interface text; `plain/index.html` is generated.
 
 ## Layout
 
 ```
 index.html          room page (capability router inline in <head>)
 plain/index.html    plain page
-content.js          ALL site text
+content.js          shared portfolio content
 assets/sections.js  content -> HTML (shared by both pages)
 assets/ui.css       shared tokens + dialog-box components
 assets/room.js      the 3D scene (procedural geometry + canvas pixel textures)
@@ -30,7 +30,7 @@ assets/plain.*      plain page layout + theme switch
 vendor/three/       pinned three.js build (see VERSION)
 ```
 
-No dependencies to install. Regenerate the plain HTML after editing content or its template. Run any static file server in the repo root to preview, for example `python3 -m http.server 8000`.
+No dependencies to install. See [Editing content](#editing-content) for regeneration requirements. Run any static file server in the repo root to preview, for example `python3 -m http.server 8000`.
 
 All models, textures and icons are hand-made for this site. It is an unofficial fan homage and uses no official game art, sprites, logos, fonts or music.
 
