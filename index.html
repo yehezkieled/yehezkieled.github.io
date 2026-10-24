@@ -70,6 +70,11 @@
       <a href="#online" data-go="online">Online</a>
     </nav>
     <button type="button" class="view-reset px" id="view-reset" hidden title="Back to the default view (0)">Reset view</button>
+    <button type="button" class="view-reset day-night px" id="day-night" aria-pressed="false" title="Switch to night (N)">
+      <svg class="sun" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="3.2" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/></g></svg>
+      <svg class="moon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M10.5 1.5A6.5 6.5 0 1 0 14.5 11 5 5 0 0 1 10.5 1.5z" fill="currentColor"/></svg>
+      <span id="day-night-label">Day</span>
+    </button>
     <div class="mode" role="group" aria-label="Site version">
       <span class="on" aria-current="true">Room</span>
       <a href="plain/?plain=1" title="Plain, text-only version">Plain</a>
@@ -77,7 +82,7 @@
     </div>
   </header>
 
-  <div id="stage" role="img" aria-label="A small 3D bedroom with Piplup and Gible wandering the floor. Drag to look around, scroll or pinch to zoom. The PC opens About, the badge case opens Work, the TV and console open Projects, the red handheld opens Posts, the phone opens Online."></div>
+  <div id="stage" role="img" aria-label="A small 3D bedroom with Piplup and Gible wandering the floor. Drag to look around, scroll or pinch to zoom. Drag a creature to lift it. The PC opens About, the badge case opens Work, the TV and console open Projects, the red handheld opens Posts, the phone opens Online."></div>
 
   <div id="hint" class="px" aria-hidden="true"></div>
   <div id="toast" class="px" role="status" aria-live="polite"></div>
