@@ -922,7 +922,7 @@ function buildPiplup() {
   });
 
   addPet({
-    name: "Piplup", group: g, x: 0.9, z: 0.9, yaw: 0.9, speed: 0.32, radius: 0.22,
+    name: "Piplup", group: g, x: 0.9, z: 0.9, yaw: 0.9, speed: 0.32, radius: 0.40,
     pose: posePiplup,
     idle: ["flap", "puff", "peck", "flap"],
     taps: ["hop", "puff", "flap", "spin", "peck"],
@@ -1033,7 +1033,7 @@ function buildGible() {
   });
 
   addPet({
-    name: "Gible", group: g, x: 1.9, z: 1.6, yaw: -0.6, speed: 0.4, radius: 0.26,
+    name: "Gible", group: g, x: 1.9, z: 1.6, yaw: -0.6, speed: 0.4, radius: 0.46,
     pose: poseGible,
     idle: ["chomp", "chomps", "wag", "wag"],
     taps: ["chomp", "spin", "chomps", "shake"],
@@ -1204,7 +1204,7 @@ function stepPets(dt) {
       y: p.held ? p.hang : p.fall ? p.fall.y : p.ground + 0.02, rx: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1, lunge: 0,
       walking: p.state === "walk" && !REDUCED,
       held: p.held && !REDUCED, falling: !!p.fall,
-      kind: p.act, u: p.act ? 1 - p.actT : 0,
+      kind: p.act, u: p.act ? (REDUCED ? 0.5 : 1 - p.actT) : 0,
       breathe: REDUCED ? 0 : Math.sin(p.age * 2.5) * 0.015,
       sleepy: nightMix > 0.5 && !p.held && !p.fall,
     };
@@ -1217,6 +1217,7 @@ function stepPets(dt) {
       o.spin = Math.sin(p.age * 6) * 0.08;
     }
     p.pose(p, o);
+    constrainLunge(p, o);
     if (p.act === p.move) stepMove(p, o, dt);
     p.group.position.set(p.x + Math.sin(p.yaw) * o.lunge, o.y, p.z + Math.cos(p.yaw) * o.lunge);
     p.group.rotation.set(o.rx, p.yaw + o.spin, o.rz);
@@ -1224,11 +1225,24 @@ function stepPets(dt) {
     const lid = p.blink > 0 ? 0.1 : o.sleepy ? 0.55 : 1;
     for (const e of p.parts.eyes) e.scale.y = lid;
     // the angry mark pops up over a tantrum and stays through the move
-    const angry = o.kind === "tantrum" ? Math.min(1, o.u * 6) : o.kind === p.move ? Math.max(0, 1 - o.u * 3) : 0;
+    const angry = REDUCED ? 0 : o.kind === "tantrum" ? Math.min(1, o.u * 6) : o.kind === p.move ? Math.max(0, 1 - o.u * 3) : 0;
     p.parts.mark.visible = angry > 0;
     p.parts.mark.scale.setScalar(0.14 * angry * (1 + Math.sin(p.age * 14) * 0.08));
   }
   stepParticles(dt);
+}
+
+function constrainLunge(p, o) {
+  if (!o.lunge) return;
+  const dx = Math.sin(p.yaw) * o.lunge, dz = Math.cos(p.yaw) * o.lunge;
+  let low = 0, high = 1;
+  if (pathClear(p, p.x, p.z, p.x + dx, p.z + dz)) return;
+  for (let i = 0; i < 12; i++) {
+    const t = (low + high) / 2;
+    if (pathClear(p, p.x, p.z, p.x + dx * t, p.z + dz * t)) low = t;
+    else high = t;
+  }
+  o.lunge *= low;
 }
 
 function posePiplup(p, o) {
@@ -1265,12 +1279,12 @@ function posePiplup(p, o) {
     o.sy = 1 - bump * 0.22; o.sx = o.sz = 1 + bump * 0.14;
     flap += bump * 1.1;
   } else if (k === "tantrum") {   // stomping, shaking, flippers beating
-    const st = Math.abs(Math.sin(u * Math.PI * 7));
-    o.y += st * 0.025; o.rz = Math.sin(u * Math.PI * 14) * 0.08;
+    const st = REDUCED ? 0 : Math.abs(Math.sin(u * Math.PI * 7));
+    o.y += st * 0.025; o.rz = REDUCED ? 0 : Math.sin(u * Math.PI * 14) * 0.08;
     flap += 0.9 + st * 0.6; puff = 0.4; headPitch -= 0.2;
-    P.feet.forEach((f, i) => { f.position.y = PIP_FOOT_Y + Math.max(0, Math.sin(u * Math.PI * 7 + i * Math.PI)) * 0.04; });
+    P.feet.forEach((f, i) => { f.position.y = PIP_FOOT_Y + (REDUCED ? 0 : Math.max(0, Math.sin(u * Math.PI * 7 + i * Math.PI)) * 0.04); });
   } else if (k === "watergun") {   // rear back and puff, then lean in and spray
-    const wind = Math.min(1, u * 4), shoot = u > 0.25 && u < 0.8 ? 1 : 0;
+    const wind = REDUCED ? 1 : Math.min(1, u * 4), shoot = u > 0.25 && u < 0.8 ? 1 : 0;
     puff = REDUCED ? 0.4 : wind * (1 - u * 0.5);
     headPitch += REDUCED ? -0.2 : (shoot ? 0.3 + Math.sin(p.age * 40) * 0.03 : -0.25 * wind);
     o.rx = REDUCED ? 0 : -0.12 * wind + shoot * 0.25;
@@ -1329,9 +1343,9 @@ function poseGible(p, o) {
     o.sy = 1 - bump * 0.2; o.sx = o.sz = 1 + bump * 0.12;
     open += Math.max(0, Math.sin(u * Math.PI * 2)) * 0.5;
   } else if (k === "tantrum") {   // stomping and shaking, jaw chattering
-    const st = Math.abs(Math.sin(u * Math.PI * 7));
-    o.y += st * 0.03; o.rz = Math.sin(u * Math.PI * 14) * 0.1;
-    open += 0.2 + st * 0.3; wag = Math.sin(u * Math.PI * 10) * 0.5;
+    const st = REDUCED ? 0 : Math.abs(Math.sin(u * Math.PI * 7));
+    o.y += st * 0.03; o.rz = REDUCED ? 0 : Math.sin(u * Math.PI * 14) * 0.1;
+    open += 0.2 + st * 0.3; wag = REDUCED ? 0 : Math.sin(u * Math.PI * 10) * 0.5;
     tuck = st;
   } else if (k === "bite") {   // crouch back, lunge with the jaw wide, snap shut
     if (REDUCED) { open += 0.6; }
