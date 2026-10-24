@@ -1,0 +1,4 @@
+three 0.186.1 (r186), from https://www.npmjs.com/package/three
+three.module.min.js = build/three.module.js + build/three.core.js bundled and minified with esbuild 0.25.0:
+  npx esbuild build/three.module.js --bundle --minify --format=esm --target=es2020 --legal-comments=none
+MIT, see LICENSE.
