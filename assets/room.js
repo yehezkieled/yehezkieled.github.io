@@ -239,48 +239,118 @@ function buildTextures() {
 }
 
 /*
-  Pet skins are painted for a SphereGeometry: canvas x runs around the body
-  (u = 0.25 is the front, 0.75 the back), canvas y runs top to bottom. They
-  are drawn larger and sampled smoothly so the edges stay clean up close.
+  Pet skins are small pixel-art canvases, sampled with nearest filtering so the
+  pixels stay crisp up close (mipmaps keep them calm at a distance). Body skins
+  wrap a SphereGeometry: canvas x runs around the body (u = 0.25 is the front,
+  0.75 the back), canvas y runs top to bottom.
 */
-const PIP = { light: "#5fb6ea", dark: "#2a57aa", eye: "#172552", beak: "#f3c640", white: "#f7fbff" };
-const GIB = { blue: "#4c84d6", navy: "#2b4a97", belly: "#e4463b", mouth: "#5e1a26", tongue: "#e86a7d", eye: "#ffd24d" };
+const PIP = { light: "#9bd8ee", dark: "#2d62b5", edge: "#214c95", eye: "#15285e", eyeLit: "#2f6cc8", beak: "#f2c23c", white: "#f7fbff", ring: "#4a86c4", mouth: "#b8323f" };
+const GIB = { blue: "#4f84a3", dark: "#3b6682", belly: "#d8402e", bellyEdge: "#b2302a", mouth: "#4d1522", tongue: "#f06a8a", eye: "#1e2538", spot: "#f2d14a" };
+const PINK = "#f49ab2";
+
+function pixelTex(w, h, draw) {
+  const t = makeTex(w, h, draw);
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  return t;
+}
+// Pixel-art helpers: everything is whole pixels on a small canvas.
+function pxEllipse(ctx, cx, cy, rx, ry, fill, outline) {
+  const inside = (x, y, ax, ay) => ((x + 0.5 - cx) / ax) ** 2 + ((y + 0.5 - cy) / ay) ** 2 <= 1;
+  for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry + 1); y++) {
+    for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx + 1); x++) {
+      if (inside(x, y, rx, ry)) { ctx.fillStyle = fill; ctx.fillRect(x, y, 1, 1); }
+      else if (outline && inside(x, y, rx + 1, ry + 1)) { ctx.fillStyle = outline; ctx.fillRect(x, y, 1, 1); }
+    }
+  }
+}
+function pxStar(ctx, x, y, arm, color) {   // a four-point sparkle
+  ctx.fillStyle = color;
+  ctx.fillRect(x - arm, y, arm * 2 + 1, 1);
+  ctx.fillRect(x, y - arm, 1, arm * 2 + 1);
+}
+// A big sparkle eye: outline ring, dark iris, a lighter lower half and starry catchlights. `s` mirrors it.
+function eyeTex(w, h, s, c) {
+  return pixelTex(w, h, (ctx) => {
+    ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2;
+    pxEllipse(ctx, cx, cy, w / 2 - 1.5, h / 2 - 1.5, c.iris, c.ring);
+    pxEllipse(ctx, cx + s * 1, cy + h * 0.16, w * 0.26, h * 0.24, c.lit);
+    pxStar(ctx, Math.round(cx - s * 2.5), Math.round(cy - h * 0.2), 2, c.spark);
+    ctx.fillStyle = c.spark;
+    ctx.fillRect(Math.round(cx - s * 3), Math.round(cy - h * 0.2) - 1, 2, 2);
+    pxStar(ctx, Math.round(cx + s * 2.5), Math.round(cy + h * 0.2), 1, c.spark);
+  });
+}
+function blushTex() {
+  return pixelTex(12, 8, (ctx, w, h) => { ctx.clearRect(0, 0, w, h); pxEllipse(ctx, 6, 4, 4.5, 2.5, PINK); });
+}
 
 function buildPetTextures() {
-  // Piplup body: cape over the back and shoulders, white belly, two chest marks.
-  TEX.pipBody = makeTex(256, 128, (ctx, w, h) => {
-    ctx.fillStyle = PIP.light; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = PIP.dark;
-    ctx.beginPath();
-    ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, 0.55 * h);
-    ctx.quadraticCurveTo(0.92 * w, 0.84 * h, 0.75 * w, 0.84 * h);
-    ctx.quadraticCurveTo(0.58 * w, 0.84 * h, 0.5 * w, 0.55 * h);
-    ctx.quadraticCurveTo(0.44 * w, 0.3 * h, 0.36 * w, 0.12 * h);
-    ctx.lineTo(0.14 * w, 0.12 * h);
-    ctx.quadraticCurveTo(0.06 * w, 0.3 * h, 0, 0.55 * h);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = PIP.white;
-    ctx.beginPath(); ctx.ellipse(0.25 * w, 0.66 * h, 0.14 * w, 0.27 * h, 0, 0, Math.PI * 2); ctx.fill();
-    for (const u of [0.215, 0.285]) {
-      ctx.beginPath(); ctx.arc(u * w, 0.33 * h, 0.028 * w, 0, Math.PI * 2); ctx.fill();
+  // Piplup head: dark cap and sides, white face with a zigzag edge and a dark peak between the eyes.
+  TEX.pipHead = pixelTex(128, 64, (ctx, w, h) => {
+    ctx.fillStyle = PIP.dark; ctx.fillRect(0, 0, w, h);
+    const zig = [0, 1, 2, 1];
+    for (let x = 4; x < 61; x++) {
+      const d = Math.abs(x - 32);
+      let top = 22 + zig[x % 4];
+      if (d < 6) top = Math.max(top, 34 - d * 2);            // the peak dips to the beak
+      if (d > 22) top += (d - 22) * 2;                        // cheeks round off toward the ears
+      const bottom = 56 - Math.max(0, d - 18) * 1.4;
+      if (bottom <= top) continue;
+      ctx.fillStyle = PIP.edge; ctx.fillRect(x, top - 1, 1, 1);
+      ctx.fillStyle = PIP.white; ctx.fillRect(x, top, 1, bottom - top);
     }
-  }, null, true);
+  });
 
-  // Piplup head: the cape hoods the crown and back, dipping to a point between the eyes.
-  TEX.pipHead = makeTex(256, 128, (ctx, w, h) => {
+  // Piplup body: light blue with a scalloped dark collar, a cape down the back and two ringed chest marks.
+  TEX.pipBody = pixelTex(128, 64, (ctx, w, h) => {
     ctx.fillStyle = PIP.light; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = PIP.dark;
-    ctx.beginPath();
-    ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, 0.36 * h);
-    ctx.lineTo(0.88 * w, 0.78 * h);
-    ctx.quadraticCurveTo(0.75 * w, 0.88 * h, 0.62 * w, 0.78 * h);
-    ctx.lineTo(0.5 * w, 0.36 * h);
-    ctx.quadraticCurveTo(0.44 * w, 0.3 * h, 0.36 * w, 0.3 * h);
-    ctx.lineTo(0.25 * w, 0.46 * h);
-    ctx.lineTo(0.14 * w, 0.3 * h);
-    ctx.quadraticCurveTo(0.06 * w, 0.3 * h, 0, 0.36 * h);
-    ctx.closePath(); ctx.fill();
-  }, null, true);
+    ctx.fillStyle = PIP.dark; ctx.fillRect(0, 0, w, 11);
+    for (let i = 0; i < 13; i++) pxEllipse(ctx, i * 10 + 5, 11, 4.5, 4.5, PIP.dark);
+    for (let x = 66; x < 126; x++) {                          // cape: a pointed dark panel on the back
+      const d = Math.abs(x - 96);
+      const bottom = 42 - Math.max(0, d - 8) * 1.6;
+      if (bottom > 11) ctx.fillRect(x, 11, 1, bottom - 11);
+    }
+    for (const cx of [24, 40]) pxEllipse(ctx, cx, 36, 5, 5, PIP.white, PIP.ring);
+  });
+  TEX.pipEyeL = eyeTex(14, 18, -1, { iris: PIP.eye, ring: "#c8e9f8", lit: PIP.eyeLit, spark: PIP.white });
+  TEX.pipEyeR = eyeTex(14, 18, 1, { iris: PIP.eye, ring: "#c8e9f8", lit: PIP.eyeLit, spark: PIP.white });
+  TEX.blush = blushTex();
+
+  // Gible jaw: the whole lower front is red, with a blue rim at the hinges.
+  TEX.gibJaw = pixelTex(64, 32, (ctx, w, h) => {
+    ctx.fillStyle = GIB.blue; ctx.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y++) {
+      const rim = Math.max(0, 7 - Math.floor(y / 3));
+      ctx.fillStyle = GIB.bellyEdge; ctx.fillRect(rim, y, 1, 1); ctx.fillRect(w - rim - 1, y, 1, 1);
+      ctx.fillStyle = GIB.belly; ctx.fillRect(rim + 1, y, w - rim * 2 - 2, 1);
+    }
+  });
+  // Gible teeth: a strip of pixel triangles, drawn pointing down; the lower row flips it.
+  TEX.gibTeeth = pixelTex(128, 8, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#fff8ee";
+    for (let x = 0; x < w; x++) {
+      const t = x % 8, half = t < 4 ? t + 1 : 8 - t;      // 1,2,3,4,4,3,2,1 pixels tall
+      ctx.fillRect(x, 0, 1, half * 2 - 1);
+    }
+  });
+  // Gible side jets: slate with two yellow spots on the outer side.
+  TEX.gibJet = pixelTex(64, 32, (ctx, w, h) => {
+    ctx.fillStyle = GIB.blue; ctx.fillRect(0, 0, w, h);
+    pxEllipse(ctx, 32, 11, 3, 3, GIB.spot);
+    pxEllipse(ctx, 33, 21, 2.5, 2, GIB.spot);
+  });
+  // the anger mark: four red lobes around a gap
+  TEX.angry = pixelTex(16, 16, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    for (const [x, y] of [[5, 5], [11, 5], [5, 11], [11, 11]]) pxEllipse(ctx, x, y, 2.5, 2.5, "#e0423a", "#8e1f1f");
+    ctx.clearRect(7, 0, 2, h); ctx.clearRect(0, 7, w, 2);
+  });
+  TEX.gibEyeL = eyeTex(14, 14, -1, { iris: GIB.eye, ring: "#2f3d58", lit: "#3a4668", spark: PIP.white });
+  TEX.gibEyeR = eyeTex(14, 14, 1, { iris: GIB.eye, ring: "#2f3d58", lit: "#3a4668", spark: PIP.white });
 }
 
 function screenTex(lines, accent, bg) {
@@ -318,8 +388,8 @@ function cyl(rt, rb, h, material, x, y, z, seg) {
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
-function ball(r, material, x, y, z, seg) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg || 10, seg || 8), material);
+function ball(r, material, x, y, z, seg, hseg) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg || 10, hseg || seg || 8), material);
   m.position.set(x || 0, y || 0, z || 0);
   m.castShadow = true; m.receiveShadow = true;
   return m;
@@ -357,18 +427,30 @@ function buildMaterials() {
   MAT.dex = new THREE.MeshBasicMaterial({ map: TEX.dex });
   MAT.poster = mat("#ffffff", { map: TEX.poster });
   MAT.felt = mat("#ffffff", { map: TEX.caseFelt });
-  MAT.pipBody = mat("#ffffff", { map: TEX.pipBody });
-  MAT.pipHead = mat("#ffffff", { map: TEX.pipHead });
-  MAT.pipDark = mat(PIP.dark);
-  MAT.pipEye = mat(PIP.eye);
-  MAT.pipWhite = mat(PIP.white);
-  MAT.beak = mat(PIP.beak);
-  MAT.gibBlue = mat(GIB.blue);
-  MAT.gibNavy = mat(GIB.navy);
-  MAT.gibBelly = mat(GIB.belly);
-  MAT.gibMouth = mat(GIB.mouth, { side: THREE.DoubleSide });
-  MAT.gibTongue = mat(GIB.tongue);
-  MAT.gibEye = mat(GIB.eye);
+  // pets: flat-shaded facets, pixel skins
+  const pmat = (color, opts) => mat(color, Object.assign({ flatShading: true }, opts || {}));
+  const decal = (map) => pmat("#ffffff", { map, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
+  MAT.pipBody = pmat("#ffffff", { map: TEX.pipBody });
+  MAT.pipHead = pmat("#ffffff", { map: TEX.pipHead });
+  MAT.pipLight = pmat(PIP.light);
+  MAT.pipDark = pmat(PIP.dark);
+  MAT.pipMouth = pmat(PIP.mouth);
+  MAT.pipEyeL = decal(TEX.pipEyeL);
+  MAT.pipEyeR = decal(TEX.pipEyeR);
+  MAT.blush = decal(TEX.blush);
+  MAT.beak = pmat(PIP.beak);
+  MAT.gibBlue = pmat(GIB.blue);
+  MAT.gibDark = pmat(GIB.dark);
+  MAT.gibJaw = pmat("#ffffff", { map: TEX.gibJaw });
+  MAT.gibJet = pmat("#ffffff", { map: TEX.gibJet });
+  MAT.gibMouth = pmat(GIB.mouth, { side: THREE.DoubleSide });
+  MAT.gibTongue = pmat(GIB.tongue);
+  MAT.gibTeeth = decal(TEX.gibTeeth);
+  MAT.gibEyeL = decal(TEX.gibEyeL);
+  MAT.gibEyeR = decal(TEX.gibEyeR);
+  MAT.angry = new THREE.SpriteMaterial({ map: TEX.angry, transparent: true, alphaTest: 0.5 });
+  MAT.water = pmat("#5fc8ff", { transparent: true, opacity: 0.85 });
+  MAT.spark = pmat("#fff3c4", { emissive: new THREE.Color("#ffd24d"), emissiveIntensity: 0.6 });
 }
 
 function buildRoom() {
@@ -615,54 +697,98 @@ function buildFurniture() {
 /* ------------------------------------------------------------------ */
 const pets = [];
 const FLOOR_EDGE = 2.72;
-// floor footprints of the furniture: [x1, z1, x2, z2]
-const OBSTACLES = [
+
+/* Surfaces: every top a pet can stand on. A surface is a height, a rectangle
+   [x1, z1, x2, z2] and the footprints of things standing on it. The floor is
+   one too, with the furniture as its blocks. Positions are world coordinates
+   read off buildRoom/buildFurniture; keep them in step when furniture moves. */
+const FOOT = 0.05;   // how close a standing pet's centre may come to a surface edge or an object on it
+const SURFACES = [];
+function surface(name, y, rect, blocks, floor) {
+  const s = { name, y, rect, blocks: blocks || [], floor: !!floor };
+  SURFACES.push(s);
+  return s;
+}
+// footprint of a w by d box centred at (x, z), turned by yaw, grown by pad
+function footprint(x, z, w, d, yaw, pad) {
+  const c = Math.abs(Math.cos(yaw || 0)), s = Math.abs(Math.sin(yaw || 0));
+  const ex = (w * c + d * s) / 2 + (pad || 0), ez = (w * s + d * c) / 2 + (pad || 0);
+  return [x - ex, z - ez, x + ex, z + ez];
+}
+const FLOOR = surface("floor", 0, [-FLOOR_EDGE, -FLOOR_EDGE, FLOOR_EDGE, FLOOR_EDGE], [
   [-2.7, -3.0, -1.1, -0.78],  // bed
   [-3.0, -0.65, -2.35, -0.05], // nightstand
   [-3.0, 0.3, -2.2, 1.9],      // TV stand
   [0.75, -3.0, 2.65, -2.1],    // desk
   [0.88, -2.22, 1.42, -1.68],  // chair
   [-2.75, 2.05, -2.15, 2.65],  // plant
-];
+], true);
+surface("blanket", 0.65, [-2.58, -2.18, -1.22, -0.92]);
+surface("bed", 0.56, [-2.56, -2.9, -1.24, -0.9], [
+  footprint(-1.9, -2.6, 0.86, 0.42),            // pillow
+  [-2.6, -2.18, -1.2, -0.9],                    // blanket (its own surface)
+]);
+surface("nightstand", 0.56, [-2.9, -0.6, -2.4, -0.1], [footprint(-2.62, -0.35, 0.3, 0.24)]);   // phone
+surface("tv stand", 0.525, [-2.86, 0.33, -2.24, 1.87], [
+  footprint(-2.5, 1.0, 0.6, 0.7, -0.35),        // TV
+  footprint(-2.33, 1.47, 0.32, 0.18, -0.35),    // handheld
+  footprint(-2.67, 0.51, 0.16, 0.22, -0.35),    // cartridges
+]);
+surface("chair", 0.49, [0.92, -2.18, 1.38, -1.72], [[0.9, -2.2, 1.4, -2.12]]);   // backrest
+surface("desk", 0.78, [0.8, -2.95, 2.6, -2.15], [
+  footprint(1.3, -2.72, 0.6, 0.5),              // PC
+  footprint(1.35, -2.24, 0.5, 0.18),            // keyboard
+  footprint(1.72, -2.27, 0.08, 0.12),           // mouse
+  footprint(2.25, -2.3, 0.22, 0.32, -0.35),     // red handheld
+  footprint(2.45, -2.75, 0.24, 0.24),           // lamp
+]);
+surface("shelf", 2.075, [-0.8, -2.99, 0.4, -2.71], [-0.58, -0.2, 0.18].map((x) => footprint(x, -2.83, 0.22, 0.22)));
+SURFACES.sort((a, b) => b.y - a.y);   // highest first: the one under the pointer wins
 
-function floorClear(x, z, r) {
-  if (Math.abs(x) > FLOOR_EDGE - r || Math.abs(z) > FLOOR_EDGE - r) return false;
-  for (const [x1, z1, x2, z2] of OBSTACLES) {
-    if (x > x1 - r && x < x2 + r && z > z1 - r && z < z2 + r) return false;
+// can a pet whose centre may come no closer than r stand at (x, z) on surface s?
+function onSurface(s, x, z, r) {
+  const [x1, z1, x2, z2] = s.rect;
+  if (x < x1 + r || x > x2 - r || z < z1 + r || z > z2 - r) return false;
+  for (const [bx1, bz1, bx2, bz2] of s.blocks) {
+    if (x > bx1 - r && x < bx2 + r && z > bz1 - r && z < bz2 + r) return false;
   }
   return true;
 }
-function pathClear(ax, az, bx, bz, r) {
+// on the floor a pet keeps its whole radius from furniture; on top of furniture only its feet must fit
+const margin = (p, s) => (s.floor ? p.radius : FOOT);
+function standClear(p, x, z, s) {
+  s = s || p.surface;
+  return onSurface(s, x, z, margin(p, s));
+}
+function pathClear(p, ax, az, bx, bz) {
   const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.08));
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    if (!floorClear(ax + (bx - ax) * t, az + (bz - az) * t, r)) return false;
+    if (!standClear(p, ax + (bx - ax) * t, az + (bz - az) * t)) return false;
   }
   return true;
 }
+// is (x, z) over any object standing on s? (water drops splash against them)
+function overBlock(s, x, z) {
+  return s.blocks.some(([x1, z1, x2, z2]) => x > x1 && x < x2 && z > z1 && z < z2);
+}
 
-/* Sculpting helpers: the pets are smoother than the furniture, so they get
-   more segments, lathed and extruded parts, and sphere slices as decals. */
-function ellipsoid(rx, ry, rz, material, x, y, z, seg) {
-  const m = ball(1, material, x, y, z, seg || 16);
+/* Sculpting helpers: the pets are low-poly, so every part keeps its segment
+   count small and its material flat-shaded, and faces are painted as pixel decals. */
+function ellipsoid(rx, ry, rz, material, x, y, z, seg, hseg) {
+  const m = ball(1, material, x, y, z, seg || 10, hseg);
   m.scale.set(rx, ry, rz);
   return m;
 }
-function sphereSlice(r, material, phiStart, phiLen, thetaStart, thetaLen, seg) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg || 28, 18, phiStart, phiLen, thetaStart, thetaLen), material);
+function sphereSlice(r, material, phiStart, phiLen, thetaStart, thetaLen, seg, hseg) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, seg || 12, hseg || 4, phiStart, phiLen, thetaStart, thetaLen), material);
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
 function disc(r, material, y, up) {
-  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 28), material);
+  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 12), material);
   m.rotation.x = up ? -Math.PI / 2 : Math.PI / 2;
   m.position.y = y;
-  return m;
-}
-function lathe(profile, material, seg) {
-  const geo = new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), seg || 12);
-  const m = new THREE.Mesh(geo, material);
-  m.castShadow = true; m.receiveShadow = true;
   return m;
 }
 function extruded(points, depth, material) {
@@ -682,7 +808,7 @@ function placed(geo, x, y, z, rx, ry, rz, sx, sy, sz) {
   );
   return geo.clone().applyMatrix4(m);
 }
-// Merge small same-material pieces (teeth, toes) into one mesh.
+// Merge small same-material pieces (toes, teeth) into one mesh.
 function merged(geos, material) {
   const pos = [], nor = [];
   for (const g of geos) {
@@ -697,6 +823,28 @@ function merged(geos, material) {
   m.castShadow = true; m.receiveShadow = true;
   return m;
 }
+/* A pixel decal (eye, blush): a patch of the ellipsoid (rx, ry, rz) around
+   direction phi/theta, w by h in size, carrying a pixel texture. The patch is
+   centred on its own origin so blinking can squash it in place. Decals cast no
+   shadow (the body already does). */
+function decalPatch(rx, ry, rz, phi, theta, w, h, material) {
+  const pl = w / (rx * Math.sin(theta)), tl = h / ry;
+  const geo = new THREE.SphereGeometry(1, 3, 3, phi - pl / 2, pl, theta - tl / 2, tl);
+  const c = new THREE.Vector3(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta));
+  geo.translate(-c.x, -c.y, -c.z);
+  const m = new THREE.Mesh(geo, material);
+  m.scale.set(rx, ry, rz);
+  const e = new THREE.Group();
+  e.position.set(c.x * rx, c.y * ry, c.z * rz);
+  e.add(m);
+  return e;
+}
+// A four-sided pyramid pointing along +z: beaks, crest spikes, cape points.
+function spike(r, len, material, x, y, z) {
+  const m = cyl(0, r, len, material, x, y, z, 4);
+  m.rotation.set(Math.PI / 2, Math.PI / 4, 0);
+  return m;
+}
 const smooth = (u) => u * u * (3 - 2 * u);
 
 function buildPets() {
@@ -704,74 +852,73 @@ function buildPets() {
   buildGible();
 }
 
-// Piplup: a plump little penguin. Light blue, dark cape, yellow beak and feet. Faces +z.
+// Piplup: a big faceted head on a short egg body, flat flippers out to the sides, wide yellow feet. Faces +z.
+const PIP_HEAD_Y = 0.37, PIP_FOOT_Y = 0.014, PIP_FOOT_Z = 0.03;
 function buildPiplup() {
   const g = new THREE.Group();
 
   const body = new THREE.Group();
-  body.position.y = 0.175;
-  body.add(ellipsoid(0.14, 0.16, 0.135, MAT.pipBody, 0, 0, 0, 28));
-  [-1, 1].forEach((s) => {   // the cape ends in two points behind the body
-    const tail = cyl(0, 0.03, 0.12, MAT.pipDark, s * 0.05, -0.07, -0.12, 6);
-    tail.scale.z = 0.5;
-    tail.rotation.x = Math.PI + 0.55;
-    tail.rotation.z = -s * 0.2;
-    body.add(tail);
-  });
+  body.position.y = 0.17;
+  body.add(ellipsoid(0.125, 0.15, 0.12, MAT.pipBody, 0, 0, 0, 10, 7));
+  const tail = spike(0.03, 0.09, MAT.pipDark, 0, -0.07, -0.12);   // the cape ends in a short tail
+  tail.rotation.x = Math.PI / 2 + 0.75;
+  tail.scale.x = 1.6;
+  body.add(tail);
   g.add(body);
 
   const head = new THREE.Group();
-  head.position.set(0, 0.385, 0.01);
-  head.add(ellipsoid(0.125, 0.12, 0.125, MAT.pipHead, 0, 0, 0, 28));
-  const eyes = [-1, 1].map((s) => {   // big navy ovals with a catchlight
-    const e = new THREE.Group();
-    const a = s * 0.46;
-    e.position.set(Math.sin(a) * 0.117, 0.012, Math.cos(a) * 0.117);
-    e.rotation.y = a;
-    e.add(ellipsoid(0.026, 0.038, 0.012, MAT.pipEye, 0, 0, 0, 14));
-    e.add(ball(0.009, MAT.pipWhite, -s * 0.007, 0.014, 0.011, 8));
+  head.position.set(0, PIP_HEAD_Y, 0.01);
+  const R = 0.15, RY = 0.145, R2 = R + 0.004;
+  head.add(ellipsoid(R, RY, R, MAT.pipHead, 0, 0, 0, 12, 8));
+  const eyes = [-1, 1].map((s) => {   // big navy sparkle eyes on the white face
+    const e = decalPatch(R2, RY + 0.004, R2, Math.PI / 2 + s * 0.4, Math.PI / 2 - 0.02, 0.07, 0.095, s < 0 ? MAT.pipEyeL : MAT.pipEyeR);
     head.add(e);
     return e;
   });
-  const beak = new THREE.Group();
-  beak.position.set(0, -0.028, 0.112);
-  const upper = cyl(0, 0.032, 0.078, MAT.beak, 0, 0.004, 0.03, 8);
-  upper.rotation.x = Math.PI / 2; upper.scale.z = 0.8;
-  const lower = cyl(0, 0.024, 0.058, MAT.beak, 0, -0.012, 0.02, 8);
-  lower.rotation.x = Math.PI / 2; lower.scale.z = 0.7;
-  beak.add(upper, lower);
+  [-1, 1].forEach((s) => head.add(decalPatch(R2, RY + 0.004, R2, Math.PI / 2 + s * 0.78, Math.PI * 0.6, 0.05, 0.028, MAT.blush)));
+  const beak = new THREE.Group();   // open in a little smile
+  beak.position.set(0, -0.028, 0.128);
+  beak.add(spike(0.034, 0.075, MAT.beak, 0, 0.008, 0.03));
+  const lower = spike(0.03, 0.06, MAT.beak, 0, -0.026, 0.024);
+  lower.rotation.x = Math.PI / 2 + 0.35;
+  lower.scale.set(1.1, 1, 0.5);
+  beak.add(lower);
+  const mouth = ellipsoid(0.022, 0.011, 0.024, MAT.pipMouth, 0, -0.01, 0.012, 6, 3);
+  beak.add(mouth);
   head.add(beak);
   const crest = new THREE.Group();   // three-point crown
-  crest.position.set(0, 0.1, -0.012);
-  const mid = cyl(0, 0.028, 0.1, MAT.pipDark, 0, 0.04, 0, 6);
-  mid.rotation.x = -0.25;
+  crest.position.set(0, 0.11, -0.02);
+  const mid = spike(0.026, 0.1, MAT.pipDark, 0, 0.04, 0);
+  mid.rotation.x = -0.2;
   crest.add(mid);
   [-1, 1].forEach((s) => {
-    const side = cyl(0, 0.02, 0.07, MAT.pipDark, s * 0.036, 0.018, 0, 6);
-    side.rotation.set(-0.2, 0, -s * 0.6);
+    const side = spike(0.02, 0.07, MAT.pipDark, s * 0.04, 0.015, 0);
+    side.rotation.set(-0.3, 0, -s * 0.7);
     crest.add(side);
   });
   head.add(crest);
   g.add(head);
 
-  const flipperProfile = [[0, 0], [0.55, 0.12], [0.9, 0.38], [1, 0.58], [0.75, 0.82], [0.3, 0.96], [0, 1]]
-    .map(([x, y]) => [x * 0.05, -y * 0.19]).reverse();
+  // flippers: flat triangular blades held out to the sides and a little down
   const flippers = [-1, 1].map((s) => {
     const f = new THREE.Group();
-    f.position.set(s * 0.125, 0.255, 0.01);
-    const blade = lathe(flipperProfile, MAT.pipDark, 12);
-    blade.scale.x = 0.4;
+    f.position.set(s * 0.105, 0.215, 0.01);
+    const blade = extruded([[0, 0.04], [0.08, 0.035], [0.17, -0.01], [0.07, -0.045]], 0.018, MAT.pipLight);
+    blade.rotation.z = -0.7;
+    blade.scale.x = s;
     f.add(blade);
     g.add(f);
     return f;
   });
 
-  const toe = new THREE.SphereGeometry(1, 8, 6);
-  const footGeo = [placed(new THREE.SphereGeometry(1, 14, 10), 0, 0, 0, 0, 0, 0, 0.045, 0.022, 0.07)];
-  [-1, 0, 1].forEach((i) => footGeo.push(placed(toe, i * 0.03, -0.002, 0.065, 0, i * 0.35, 0, 0.018, 0.016, 0.032)));
+  // feet: a flat wedge with three toes, merged into one yellow mesh
+  const toe = new THREE.BoxGeometry(0.022, 0.016, 0.04);
+  const footGeo = [placed(new THREE.BoxGeometry(0.08, 0.02, 0.07), 0, 0, 0.008)];
+  [-1, 0, 1].forEach((i) => footGeo.push(placed(toe, i * 0.028, -0.002, 0.052, 0, i * 0.3, 0)));
   const feet = [-1, 1].map((s) => {
     const foot = merged(footGeo, MAT.beak);
-    foot.position.set(s * 0.055, 0.022, 0.035);
+    foot.position.set(s * 0.052, PIP_FOOT_Y, PIP_FOOT_Z);
+    foot.rotation.y = s * 0.12;
     g.add(foot);
     return foot;
   });
@@ -786,88 +933,93 @@ function buildPiplup() {
       hop: "Piplup: pip-lup!", puff: "Piplup: *puffs out its chest*", flap: "Piplup: *flap flap*",
       spin: "Piplup: lup lup!", peck: "Piplup: pip!", still: "Piplup: pip-lup!",
       lift: "Piplup: lup?!", land: "Piplup: pip!",
+      tantrum: "Piplup: pip pip PIP! *stomp stomp*", move: "Piplup used Water Gun!",
     },
-    parts: { body, head, eyes, beak, flippers, feet },
+    move: "watergun",
+    parts: { body, head, eyes, beak, flippers, feet, mark: angryMark(g, 0.13, 0.57) },
   });
 }
 
-// Gible: a big round shark head on stubby legs, almost all mouth. Faces +z.
+// Gible: one tall faceted egg of a body, the lower front all mouth. Faces +z.
+const GIB_BODY_Y = 0.27;
 function buildGible() {
   const g = new THREE.Group();
-  const R = 0.2, TH = Math.PI * 0.6;          // mouth line sits just below the middle
-  const ringR = R * Math.sin(TH), ringY = R * Math.cos(TH);
+  const RX = 0.2, RY = 0.235, RZ = 0.19, TH = Math.PI * 0.52;   // the lip line sits just below the middle
+  const ringR = Math.sin(TH), ringY = Math.cos(TH);               // on the unit sphere; the body scales it
 
+  // the body is built on a unit sphere and scaled, so every slice lines up
   const head = new THREE.Group();
-  head.position.y = 0.255;
-  head.scale.set(1.06, 0.97, 1);   // a touch wider than tall
-  head.add(sphereSlice(R, MAT.gibBlue, 0, Math.PI * 2, 0, TH));                   // crown down to the upper lip
-  head.add(sphereSlice(R, MAT.gibBlue, Math.PI, Math.PI, TH, Math.PI - TH));      // solid back below the lip
-  head.add(sphereSlice(R - 0.008, MAT.gibMouth, Math.PI, Math.PI, TH, Math.PI - TH)); // dark inside wall
-  head.add(disc(ringR, MAT.gibMouth, ringY - 0.002, false));                      // roof of the mouth
+  head.position.y = GIB_BODY_Y;
+  const shell = new THREE.Group();
+  shell.scale.set(RX, RY, RZ);
+  shell.add(sphereSlice(1, MAT.gibBlue, 0, Math.PI * 2, 0, TH, 12, 5));                    // crown down to the upper lip
+  shell.add(sphereSlice(1, MAT.gibBlue, Math.PI, Math.PI, TH, Math.PI - TH, 6, 4));       // solid back below the lip
+  shell.add(sphereSlice(0.96, MAT.gibMouth, Math.PI, Math.PI, TH, Math.PI - TH, 6, 4));   // dark inside wall
+  shell.add(disc(ringR, MAT.gibMouth, ringY - 0.01, false));                               // roof of the mouth
+  head.add(shell);
 
-  // lower jaw: the front half below the lip, hinged at the center so it swings open as a wedge
+  // lower jaw: the red front half below the lip, hinged at the lip line so it swings open as a wedge
   const jaw = new THREE.Group();
-  jaw.add(sphereSlice(R, MAT.gibBlue, 0, Math.PI, TH, Math.PI - TH));
-  jaw.add(sphereSlice(R + 0.004, MAT.gibBelly, Math.PI * 0.08, Math.PI * 0.84, TH + 0.08, Math.PI - TH - 0.3)); // red underside
-  jaw.add(disc(ringR, MAT.gibMouth, ringY + 0.002, true));                        // floor of the mouth
-  jaw.add(ellipsoid(0.075, 0.018, 0.085, MAT.gibTongue, 0, ringY + 0.01, 0.05, 14));
+  jaw.position.y = ringY * RY;
+  const jawShell = new THREE.Group();
+  jawShell.scale.set(RX, RY, RZ);
+  jawShell.position.y = -ringY * RY;
+  jawShell.add(sphereSlice(1, MAT.gibJaw, 0, Math.PI, TH, Math.PI - TH, 6, 4));
+  jawShell.add(disc(ringR, MAT.gibMouth, ringY + 0.01, true));                              // floor of the mouth
+  jaw.add(jawShell);
+  jaw.add(ellipsoid(0.08, 0.02, 0.09, MAT.gibTongue, 0, 0.012, 0.06, 6, 3));
   head.add(jaw);
 
-  // teeth: one merged strip hanging from the upper lip, one standing on the jaw
-  const tooth = new THREE.ConeGeometry(0.013, 0.04, 5);
-  const strip = (n, offset, down) => {
-    const parts = [];
-    for (let i = 0; i < n; i++) {
-      const a = -1.75 + (3.5 * (i + offset)) / (n - 1 + offset * 2);
-      const r = ringR + 0.003;
-      parts.push(placed(tooth, Math.sin(a) * r, ringY + (down ? -0.012 : 0.012), Math.cos(a) * r,
-        down ? Math.PI - 0.2 : 0.2, a, 0));
-    }
-    return merged(parts, MAT.cream);
+  // teeth: pixel zigzag strips lining the front half of each lip
+  const teeth = (down) => {
+    const r = ringR * RX + 0.004;
+    const geo = new THREE.CylinderGeometry(r, r, 0.024, 12, 1, true, -Math.PI / 2, Math.PI);
+    geo.scale(1, 1, RZ / RX);
+    const m = new THREE.Mesh(geo, MAT.gibTeeth);
+    if (!down) m.rotation.z = Math.PI;
+    m.position.y = down ? ringY * RY - 0.011 : 0.011;
+    return m;
   };
-  head.add(strip(7, 0, true));
-  jaw.add(strip(6, 0.5, false));
+  head.add(teeth(true));
+  jaw.add(teeth(false));
 
-  // eyes: small yellow eyes with dark pupils, set high on the sides
+  // eyes: big round sparkle eyes high on the front, blush under them
+  const RX2 = RX + 0.004, RY2 = RY + 0.004, RZ2 = RZ + 0.004;
   const eyes = [-1, 1].map((s) => {
-    const e = new THREE.Group();
-    const a = s * 0.62, th = Math.PI * 0.4;
-    const dir = new THREE.Vector3(Math.sin(a) * Math.sin(th), Math.cos(th), Math.cos(a) * Math.sin(th));
-    e.position.copy(dir).multiplyScalar(R - 0.004);
-    e.lookAt(dir.clone().multiplyScalar(2).add(head.position));
-    e.add(ellipsoid(0.036, 0.032, 0.006, MAT.gibNavy, 0, 0, 0, 14));
-    e.add(ellipsoid(0.028, 0.025, 0.01, MAT.gibEye, 0, 0, 0.003, 14));
-    e.add(ellipsoid(0.011, 0.016, 0.008, MAT.ink, s * 0.004, 0, 0.01, 10));
-    e.add(ball(0.005, MAT.pipWhite, s * 0.008, 0.008, 0.016, 6));
+    const e = decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.55, Math.PI * 0.39, 0.1, 0.1, s < 0 ? MAT.gibEyeL : MAT.gibEyeR);
     head.add(e);
     return e;
   });
+  [-1, 1].forEach((s) => head.add(decalPatch(RX2, RY2, RZ2, Math.PI / 2 + s * 0.85, Math.PI * 0.48, 0.05, 0.03, MAT.blush)));
 
-  // dorsal fin with a notched trailing edge
-  const fin = extruded([[0.07, 0], [0.065, 0.07], [0.02, 0.15], [-0.03, 0.2], [-0.07, 0.11], [-0.045, 0.09], [-0.085, 0.04], [-0.09, 0]], 0.05, MAT.gibNavy);
+  // tall dorsal fin swept back
+  const fin = extruded([[0.06, 0], [0.03, 0.1], [-0.04, 0.22], [-0.11, 0.2], [-0.1, 0.1], [-0.14, 0]], 0.05, MAT.gibBlue);
   fin.rotation.y = -Math.PI / 2;
-  fin.position.set(0, R - 0.035, -0.03);
+  fin.position.set(0, RY - 0.08, -0.04);
   head.add(fin);
 
-  // side jets: tapered fins sweeping back and out from each side of the head
+  // side jets: round faceted pods with yellow spots, one on each side
   [-1, 1].forEach((s) => {
-    const holder = new THREE.Group();
-    holder.position.set(s * (R - 0.06), 0.03, -0.02);
-    holder.rotation.set(0, s * (Math.PI / 2 + 0.75), s * 0.12);   // local +z (the point) goes back and out
-    const jet = cyl(0, 0.07, 0.24, MAT.gibNavy, 0, 0.06, 0, 8);
-    jet.rotation.x = Math.PI / 2;   // point along local +z, which the holder turns outward
-    jet.scale.set(1, 1, 0.4);       // flat
-    holder.add(jet);
-    head.add(holder);
+    const jet = ellipsoid(0.085, 0.08, 0.1, MAT.gibJet, s * (RX + 0.02), 0.09, -0.03, 6, 4);
+    jet.rotation.y = s < 0 ? Math.PI : 0;   // the spots face outward
+    jet.rotation.z = s * 0.15;
+    head.add(jet);
+  });
+
+  // stubby arms angled out and forward
+  [-1, 1].forEach((s) => {
+    const arm = cyl(0.015, 0.04, 0.13, MAT.gibBlue, s * (RX + 0.01), -0.06, 0.05, 5);
+    arm.rotation.set(0.5, 0, s * 1.9);
+    head.add(arm);
   });
   g.add(head);
 
   const tail = new THREE.Group();
-  tail.position.set(0, 0.17, -0.16);
-  const cone = cyl(0, 0.06, 0.2, MAT.gibBlue, 0, 0, -0.09, 10);
+  tail.position.set(0, 0.16, -0.16);
+  const cone = cyl(0, 0.06, 0.2, MAT.gibBlue, 0, 0, -0.09, 6);
   cone.rotation.x = -Math.PI / 2;
   tail.add(cone);
-  const tailFin = extruded([[0.03, 0], [-0.03, 0.08], [-0.07, 0]], 0.025, MAT.gibNavy);
+  const tailFin = extruded([[0.03, 0], [-0.03, 0.08], [-0.07, 0]], 0.025, MAT.gibBlue);
   tailFin.rotation.y = -Math.PI / 2;
   tailFin.position.set(0, 0.015, -0.13);
   tail.add(tailFin);
@@ -875,9 +1027,9 @@ function buildGible() {
 
   const legs = [-1, 1].map((s) => {
     const leg = new THREE.Group();
-    leg.position.set(s * 0.085, 0, 0.02);
-    leg.add(cyl(0.042, 0.05, 0.12, MAT.gibBlue, 0, 0.06, 0, 12));
-    leg.add(ellipsoid(0.055, 0.02, 0.07, MAT.gibNavy, 0, 0.014, 0.025, 12));
+    leg.position.set(s * 0.09, 0, 0.02);
+    leg.add(cyl(0.04, 0.048, 0.1, MAT.gibBlue, 0, 0.05, 0, 6));
+    leg.add(ellipsoid(0.055, 0.02, 0.07, MAT.gibDark, 0, 0.014, 0.025, 6, 3));
     g.add(leg);
     return leg;
   });
@@ -892,8 +1044,10 @@ function buildGible() {
       chomp: "Gible: *chomp!*", chomps: "Gible: gib gib gib!", spin: "Gible: gib!",
       shake: "Gible: *wiggles*", wag: "Gible: gib?", still: "Gible: gib gib!",
       lift: "Gible: gib gib?!", land: "Gible: gib!",
+      tantrum: "Gible: GIB GIB! *stomp stomp*", move: "Gible used Bite!",
     },
-    parts: { head, jaw, eyes, tail, legs },
+    move: "bite",
+    parts: { head, jaw, eyes, tail, legs, mark: angryMark(g, 0.2, 0.56) },
   });
 }
 
@@ -907,6 +1061,7 @@ function addPet(o) {
     age: Math.random() * 10, blink: 0, nextBlink: 2 + Math.random() * 4,
     act: null, actT: 0, nextAct: 3 + Math.random() * 4, cue: null, tapIdx: Math.floor(Math.random() * o.taps.length),
     held: false, fall: null, y: 0.02, vx: 0, vz: 0,
+    surface: FLOOR, ground: 0, hang: LIFT_Y, move: o.move, lunge: 0, emit: 0,
   };
   p.group.position.set(p.x, 0.02, p.z);
   p.group.rotation.y = p.yaw;
@@ -916,7 +1071,7 @@ function addPet(o) {
 }
 
 /* Short animations. ACT_LEN sets each act's duration in seconds; p.actT runs 1 -> 0. */
-const ACT_LEN = { hop: 0.9, flap: 1.1, puff: 1.6, spin: 1.0, peck: 0.9, chomp: 0.9, chomps: 1.2, shake: 1.1, wag: 1.3, yawn: 1.8, land: 0.7 };
+const ACT_LEN = { hop: 0.9, flap: 1.1, puff: 1.6, spin: 1.0, peck: 0.9, chomp: 0.9, chomps: 1.2, shake: 1.1, wag: 1.3, yawn: 1.8, land: 0.7, tantrum: 1.5, watergun: 1.6, bite: 1.2 };
 function play(p, kind) {
   if (p.held || p.fall) return;
   p.act = kind;
@@ -933,13 +1088,14 @@ function setWalk(p, x, z) {
 
 function pickWalk(p) {
   const other = pets.find((q) => q !== p);
+  const s = p.surface, span = Math.min(s.rect[2] - s.rect[0], s.rect[3] - s.rect[1]);
   for (let i = 0; i < 24; i++) {
-    const reach = 0.6 + Math.random() * 1.6;
+    const reach = s.floor ? 0.6 + Math.random() * 1.6 : 0.08 + Math.random() * span * 0.5;   // short strolls on furniture
     const a = Math.random() * Math.PI * 2;
     const x = p.x + Math.cos(a) * reach, z = p.z + Math.sin(a) * reach;
-    if (!floorClear(x, z, p.radius)) continue;
-    if (other && Math.hypot(other.x - x, other.z - z) < 0.6) continue;
-    if (!pathClear(p.x, p.z, x, z, p.radius)) continue;
+    if (!standClear(p, x, z)) continue;
+    if (other && other.surface === s && Math.hypot(other.x - x, other.z - z) < 0.6) continue;
+    if (!pathClear(p, p.x, p.z, x, z)) continue;
     setWalk(p, x, z);
     return;
   }
@@ -951,12 +1107,12 @@ let meetTimer = 14;
 function startMeet() {
   meetTimer = 20 + Math.random() * 20;
   const [a, b] = pets;
-  if (!b || a.state !== "idle" || b.state !== "idle" || a.act || b.act || a.held || b.held || a.fall || b.fall) { meetTimer = 6; return; }
+  if (!b || a.surface !== b.surface || a.state !== "idle" || b.state !== "idle" || a.act || b.act || a.held || b.held || a.fall || b.fall) { meetTimer = 6; return; }
   const p = Math.random() < 0.5 ? a : b, q = p === a ? b : a;
   for (let i = 0; i < 24; i++) {
     const ang = Math.random() * Math.PI * 2, d = p.radius + q.radius + 0.12;
     const x = q.x + Math.cos(ang) * d, z = q.z + Math.sin(ang) * d;
-    if (!floorClear(x, z, p.radius) || !pathClear(p.x, p.z, x, z, p.radius)) continue;
+    if (!standClear(p, x, z) || !pathClear(p, p.x, p.z, x, z)) continue;
     setWalk(p, x, z);
     p.visiting = q;
     q.timer = Math.max(q.timer, p.walkLen / p.speed + 2.5);   // wait for the visitor
@@ -989,20 +1145,25 @@ function stepPets(dt) {
   if (!REDUCED && (meetTimer -= dt) <= 0) startMeet();
   for (const p of pets) {
     if (p.act && (p.actT -= dt / ACT_LEN[p.act]) <= 0) p.act = null;
-    if (p.cue && (p.cue.delay -= dt) <= 0) { play(p, p.cue.kind); p.cue = null; }
+    if (p.cue && (p.cue.delay -= dt) <= 0) {
+      play(p, p.cue.kind);
+      if (p.cue.kind === p.move) say(p.lines.move, 2000);
+      p.cue = null;
+    }
 
     if (p.held) {   // dangling under the pointer; trail it a little so it swings
       const k = REDUCED ? 1 : Math.min(1, dt * 14);
       const nx = p.x + (lift.x - p.x) * k, nz = p.z + (lift.z - p.z) * k;
       p.vx = dt > 0 ? (nx - p.x) / dt : 0; p.vz = dt > 0 ? (nz - p.z) / dt : 0;
       p.x = nx; p.z = nz;
+      p.hang += (lift.surface.y + LIFT_Y - p.hang) * k;   // rise or sink with the surface under the pointer
     } else if (p.fall) {   // dropped: fall onto the landing spot, then bounce
       const f = p.fall;
       f.vy -= dt * 7;
       f.y += f.vy * dt;
       const k = Math.min(1, dt * 10);
       p.x += (f.x - p.x) * k; p.z += (f.z - p.z) * k;
-      if (f.y <= 0.02) {
+      if (f.y <= p.ground + 0.02) {
         p.fall = null; p.x = f.x; p.z = f.z;
         play(p, "land");
         say(p.lines.land);
@@ -1042,7 +1203,7 @@ function stepPets(dt) {
     if (!REDUCED) p.age += dt;
 
     const o = {
-      y: p.held ? LIFT_Y : p.fall ? p.fall.y : 0.02, rx: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1,
+      y: p.held ? p.hang : p.fall ? p.fall.y : p.ground + 0.02, rx: 0, rz: 0, spin: 0, sx: 1, sy: 1, sz: 1, lunge: 0,
       walking: p.state === "walk" && !REDUCED,
       held: p.held && !REDUCED, falling: !!p.fall,
       kind: p.act, u: p.act ? 1 - p.actT : 0,
@@ -1058,12 +1219,18 @@ function stepPets(dt) {
       o.spin = Math.sin(p.age * 6) * 0.08;
     }
     p.pose(p, o);
-    p.group.position.set(p.x, o.y, p.z);
+    if (p.act === p.move) stepMove(p, o, dt);
+    p.group.position.set(p.x + Math.sin(p.yaw) * o.lunge, o.y, p.z + Math.cos(p.yaw) * o.lunge);
     p.group.rotation.set(o.rx, p.yaw + o.spin, o.rz);
     p.group.scale.set(o.sx, o.sy, o.sz);
     const lid = p.blink > 0 ? 0.1 : o.sleepy ? 0.55 : 1;
     for (const e of p.parts.eyes) e.scale.y = lid;
+    // the angry mark pops up over a tantrum and stays through the move
+    const angry = o.kind === "tantrum" ? Math.min(1, o.u * 6) : o.kind === p.move ? Math.max(0, 1 - o.u * 3) : 0;
+    p.parts.mark.visible = angry > 0;
+    p.parts.mark.scale.setScalar(0.14 * angry * (1 + Math.sin(p.age * 14) * 0.08));
   }
+  stepParticles(dt);
 }
 
 function posePiplup(p, o) {
@@ -1078,8 +1245,8 @@ function posePiplup(p, o) {
   }
   P.feet.forEach((f, i) => {
     const ph = g + i * Math.PI;
-    f.position.y = 0.022 + (o.walking ? Math.max(0, Math.sin(ph)) * 0.03 : 0);
-    f.position.z = 0.035 + (o.walking ? Math.cos(ph) * 0.03 : 0);
+    f.position.y = PIP_FOOT_Y + (o.walking ? Math.max(0, Math.sin(ph)) * 0.03 : 0);
+    f.position.z = PIP_FOOT_Z + (o.walking ? Math.cos(ph) * 0.03 : 0);
   });
   if (k === "hop") {
     o.y += bump * 0.2; flap += bump * 1.3;
@@ -1099,18 +1266,29 @@ function posePiplup(p, o) {
   } else if (k === "land") {   // squash on touchdown, flippers out
     o.sy = 1 - bump * 0.22; o.sx = o.sz = 1 + bump * 0.14;
     flap += bump * 1.1;
+  } else if (k === "tantrum") {   // stomping, shaking, flippers beating
+    const st = Math.abs(Math.sin(u * Math.PI * 7));
+    o.y += st * 0.025; o.rz = Math.sin(u * Math.PI * 14) * 0.08;
+    flap += 0.9 + st * 0.6; puff = 0.4; headPitch -= 0.2;
+    P.feet.forEach((f, i) => { f.position.y = PIP_FOOT_Y + Math.max(0, Math.sin(u * Math.PI * 7 + i * Math.PI)) * 0.04; });
+  } else if (k === "watergun") {   // rear back and puff, then lean in and spray
+    const wind = Math.min(1, u * 4), shoot = u > 0.25 && u < 0.8 ? 1 : 0;
+    puff = REDUCED ? 0.4 : wind * (1 - u * 0.5);
+    headPitch += REDUCED ? -0.2 : (shoot ? 0.3 + Math.sin(p.age * 40) * 0.03 : -0.25 * wind);
+    o.rx = REDUCED ? 0 : -0.12 * wind + shoot * 0.25;
+    flap += wind * 0.9;
   }
   if (o.held) {   // flaps in a panic, feet dangle
     flap += (0.5 + 0.5 * Math.sin(p.age * 16)) * 1.1;
     swing = Math.sin(p.age * 16) * 0.2;
-    P.feet.forEach((f, i) => { f.position.y = 0.012 + Math.sin(p.age * 9 + i) * 0.01; });
+    P.feet.forEach((f, i) => { f.position.y = PIP_FOOT_Y - 0.01 + Math.sin(p.age * 9 + i) * 0.01; });
   } else if (o.sleepy && !k && !o.walking) {
     headPitch += 0.18 + Math.sin(p.age * 1.4) * 0.05;   // nodding off
   }
   // chest puff: the body swells, the head tips back, the flippers brace behind
   P.body.scale.set(1 + puff * 0.1, 1 + puff * 0.04 + o.breathe, 1 + puff * 0.1);
   P.head.rotation.set(headPitch - puff * 0.35, p.headYaw, 0);
-  P.head.position.y = 0.385 + o.breathe * 1.5 + puff * 0.012;
+  P.head.position.y = PIP_HEAD_Y + o.breathe * 1.5 + puff * 0.012;
   P.flippers.forEach((f, i) => {
     const s = i ? 1 : -1;
     f.rotation.z = s * (flap - puff * 0.2);
@@ -1121,7 +1299,7 @@ function posePiplup(p, o) {
 function poseGible(p, o) {
   const P = p.parts, k = o.kind, u = o.u, bump = o.bump;
   const g = o.walking ? p.age * 7.5 : 0;
-  let open = 0.07, wag = 0, tuck = 0;
+  let open = 0.12, wag = 0, tuck = 0;
   if (o.walking) {   // jaw-first hops: mouth drops open in the air and snaps shut on landing
     const h = Math.max(0, Math.sin(g));
     o.y += h * 0.1;
@@ -1152,6 +1330,20 @@ function poseGible(p, o) {
   } else if (k === "land") {
     o.sy = 1 - bump * 0.2; o.sx = o.sz = 1 + bump * 0.12;
     open += Math.max(0, Math.sin(u * Math.PI * 2)) * 0.5;
+  } else if (k === "tantrum") {   // stomping and shaking, jaw chattering
+    const st = Math.abs(Math.sin(u * Math.PI * 7));
+    o.y += st * 0.03; o.rz = Math.sin(u * Math.PI * 14) * 0.1;
+    open += 0.2 + st * 0.3; wag = Math.sin(u * Math.PI * 10) * 0.5;
+    tuck = st;
+  } else if (k === "bite") {   // crouch back, lunge with the jaw wide, snap shut
+    if (REDUCED) { open += 0.6; }
+    else {
+      const wind = Math.min(1, u * 3.3), lungeT = smooth(clamp((u - 0.3) * 5, 0, 1)), back = smooth(clamp((u - 0.65) * 3, 0, 1));
+      o.lunge = -0.05 * wind + (0.19 * lungeT) * (1 - back) + 0.05 * wind * back;
+      open += u < 0.5 ? wind * 1.1 : Math.max(0, 1.1 - (u - 0.5) * 14);
+      o.rx = -0.25 * wind * (1 - lungeT) + 0.3 * lungeT * (1 - back);
+      o.y += lungeT * (1 - back) * 0.06;
+    }
   }
   if (o.held) {   // legs kick, jaw snaps at the air
     open += (0.5 + 0.5 * Math.sin(p.age * 11)) * 0.4;
@@ -1164,9 +1356,127 @@ function poseGible(p, o) {
   P.jaw.rotation.x = open;
   P.tail.rotation.y = wag;
   P.head.rotation.y = p.headYaw * 0.6;
-  P.head.position.y = 0.255 + o.breathe * 1.2;
-  P.head.scale.set(1.06 + o.breathe, 0.97 + o.breathe, 1 + o.breathe);
+  P.head.position.y = GIB_BODY_Y + o.breathe * 1.2;
+  P.head.scale.set(1 + o.breathe, 1 + o.breathe, 1 + o.breathe);
   P.legs.forEach((l) => { l.position.y = tuck * 0.03; });
+}
+
+/* Tantrums: a tap sometimes sets a pet off. It stomps and shakes under an angry
+   mark, then uses its move: Piplup sprays a Water Gun, Gible lunges with a Bite. */
+const TANTRUM_CHANCE = 0.25;
+
+// the comic anger mark: a billboard that pops up beside the head
+function angryMark(group, x, y) {
+  const mark = new THREE.Sprite(MAT.angry);
+  mark.position.set(x, y, 0);
+  mark.visible = false;
+  mark.raycast = () => {};
+  group.add(mark);
+  return mark;
+}
+
+/* Particles: a pool of low-poly water drops and a pool of sparks, one instanced
+   mesh each, so the moves cost two draw calls however many are flying. */
+const DROPS = 56, SPARKS = 16;
+const drops = [], sparks = [];
+let dropMesh, sparkMesh;
+const pM = new THREE.Matrix4(), pQ = new THREE.Quaternion(), pS = new THREE.Vector3(), pV = new THREE.Vector3();
+function buildParticles() {
+  const pool = (geo, material, n, list) => {
+    const m = new THREE.InstancedMesh(geo, material, n);
+    m.frustumCulled = false;
+    m.raycast = () => {};
+    for (let i = 0; i < n; i++) {
+      list.push({ life: 0, ttl: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, size: 0, splash: false, s: FLOOR });
+      pM.makeScale(0, 0, 0); m.setMatrixAt(i, pM);
+    }
+    scene.add(m);
+    return m;
+  };
+  dropMesh = pool(new THREE.IcosahedronGeometry(0.013, 0), MAT.water, DROPS, drops);
+  sparkMesh = pool(new THREE.TetrahedronGeometry(0.03, 0), MAT.spark, SPARKS, sparks);
+}
+function spawn(list, x, y, z, vx, vy, vz, ttl, size, splash, s) {
+  const d = list.find((o) => o.life <= 0);
+  if (!d) return;
+  d.x = x; d.y = y; d.z = z; d.vx = vx; d.vy = vy; d.vz = vz;
+  d.life = d.ttl = ttl; d.size = size; d.splash = splash; d.s = s;
+}
+function stepParticles(dt) {
+  if (!dropMesh) return;
+  let live = false;
+  drops.forEach((d, i) => {
+    if (d.life > 0) {
+      live = true;
+      d.life -= dt; d.vy -= dt * 3.2;
+      d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+      // drops splash on the surface the pet stands on, on things standing on it, the floor and the walls
+      const ground = onSurface(d.s, d.x, d.z, 0) ? d.s.y : 0;
+      const hit = d.y <= ground + 0.012 || d.x < -2.95 || d.z < -2.95 || (d.y < d.s.y + 0.3 && overBlock(d.s, d.x, d.z));
+      if (hit && d.splash) {
+        for (let k = 0; k < 3; k++) spawn(drops, d.x, Math.max(d.y, ground + 0.012), d.z, (Math.random() - 0.5) * 0.5, 0.4 + Math.random() * 0.5, (Math.random() - 0.5) * 0.5, 0.3, 0.55, false, d.s);
+      }
+      if (hit) d.life = 0;
+    }
+    pS.setScalar(d.life > 0 ? d.size * (0.6 + 0.4 * d.life / d.ttl) : 0);
+    pM.compose(pV.set(d.x, d.y, d.z), pQ, pS);
+    dropMesh.setMatrixAt(i, pM);
+  });
+  sparks.forEach((d, i) => {
+    if (d.life > 0) {
+      live = true;
+      d.life -= dt;
+      d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+    }
+    pS.setScalar(d.life > 0 ? d.size * (d.life / d.ttl) : 0);
+    pQ.setFromAxisAngle(pV.set(0, 1, 0), d.life * 9);
+    pM.compose(pV.set(d.x, d.y, d.z), pQ, pS);
+    sparkMesh.setMatrixAt(i, pM);
+  });
+  if (live || dropMesh.userData.live) {   // one extra pass clears the last survivors
+    dropMesh.instanceMatrix.needsUpdate = sparkMesh.instanceMatrix.needsUpdate = true;
+  }
+  dropMesh.userData.live = live;
+}
+// a point in the pet's own frame (x right, y up, z forward), in world space
+function petPoint(p, o, lx, ly, lz) {
+  const c = Math.cos(p.yaw), sn = Math.sin(p.yaw);
+  return [p.x + lx * c + lz * sn, o.y + ly, p.z - lx * sn + lz * c];
+}
+// the effects of a move, timed by o.u running 0 -> 1 over the act
+function stepMove(p, o, dt) {
+  if (REDUCED) return;
+  const u = o.u, c = Math.cos(p.yaw), sn = Math.sin(p.yaw);
+  if (p.move === "watergun") {
+    if (u < 0.25 || u > 0.8) { p.emit = 0; return; }
+    p.emit += dt * 60;
+    while (p.emit >= 1) {
+      p.emit -= 1;
+      const [x, y, z] = petPoint(p, o, 0, PIP_HEAD_Y - 0.01, 0.28);
+      const v = 1.7 + Math.random() * 0.3, r = () => (Math.random() - 0.5) * 0.3;
+      spawn(drops, x, y, z, sn * v + r(), 0.55 + r(), c * v + r(), 1.0, 0.8 + Math.random() * 0.5, true, p.surface);
+    }
+  } else if (p.move === "bite") {
+    if (u < 0.3) p.emit = 0;
+    if (u >= 0.5 && !p.emit) {   // the snap: one burst of sparks off the jaws
+      p.emit = 1;
+      const [x, y, z] = petPoint(p, o, 0, GIB_BODY_Y - 0.02, 0.19 + o.lunge);
+      for (let k = 0; k < 10; k++) {
+        const a = Math.random() * Math.PI * 2, sp = 0.5 + Math.random() * 0.7;
+        spawn(sparks, x, y, z, Math.cos(a) * sp + sn * 0.5, (Math.random() - 0.3) * 0.8, Math.sin(a) * sp + c * 0.5, 0.35, 0.7 + Math.random() * 0.6, false, p.surface);
+      }
+    }
+  }
+}
+
+/* The landing ring: shows where a lifted pet will come down. */
+let landRing;
+function buildLandRing() {
+  landRing = new THREE.Mesh(new THREE.RingGeometry(0.13, 0.19, 16), new THREE.MeshBasicMaterial({ color: "#ffd24d", transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide }));
+  landRing.rotation.x = -Math.PI / 2;
+  landRing.visible = false;
+  landRing.raycast = () => {};
+  scene.add(landRing);
 }
 
 /* Lifting: press and drag on a pet to carry it; it dangles below the pointer and
@@ -1178,7 +1488,8 @@ const liftPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), LIFT_PLANE);
 const liftPoint = new THREE.Vector3();
 
 function liftPet(p, pointerId, clientX, clientY) {
-  lift = { pet: p, pointerId, x: p.x, z: p.z };
+  lift = { pet: p, pointerId, x: p.x, z: p.z, surface: p.surface, land: null };
+  p.hang = p.ground + LIFT_Y;
   p.held = true; p.fall = null; p.act = null; p.cue = null; p.visiting = null;
   p.state = "idle"; p.timer = 2 + Math.random() * 2;
   p.vx = p.vz = 0;
@@ -1192,36 +1503,52 @@ function moveLift(clientX, clientY) {
   ndc.x = ((clientX - r.left) / r.width) * 2 - 1;
   ndc.y = -((clientY - r.top) / r.height) * 2 + 1;
   raycaster.setFromCamera(ndc, camera);
-  if (!raycaster.ray.intersectPlane(liftPlane, liftPoint)) return;
-  const edge = FLOOR_EDGE - lift.pet.radius;
-  lift.x = clamp(liftPoint.x, -edge, edge);
-  lift.z = clamp(liftPoint.z, -edge, edge);
+  // the pet hangs below the pointer; test each surface's hanging plane, highest first
+  for (const s of SURFACES) {
+    liftPlane.constant = s.y + LIFT_PLANE;
+    if (!raycaster.ray.intersectPlane(liftPlane, liftPoint)) continue;
+    if (!s.floor && !onSurface(s, liftPoint.x, liftPoint.z, 0)) continue;
+    lift.surface = s;
+    const edge = FLOOR_EDGE - lift.pet.radius;
+    lift.x = clamp(liftPoint.x, -edge, edge);
+    lift.z = clamp(liftPoint.z, -edge, edge);
+    break;
+  }
+  lift.land = landingSpot(lift.x, lift.z, lift.pet, lift.surface);
+  landRing.position.set(lift.land.x, lift.land.s.y + 0.006, lift.land.z);
+  landRing.visible = true;
 }
-// Find a clear floor spot near (x, z), sampling outward in rings.
-function landingSpot(x, z, p) {
-  const clear = (nx, nz) => floorClear(nx, nz, p.radius) && pets.every((q) =>
-    q === p || Math.hypot(q.x - nx, q.z - nz) >= p.radius + q.radius);
-  if (clear(x, z)) return [x, z];
-  for (let d = 0.12; d < 6; d += 0.12) {
+// Find a clear spot on surface s near (x, z), sampling outward in rings; a full
+// surface hands over to the floor below.
+function landingSpot(x, z, p, s) {
+  const clear = (nx, nz) => standClear(p, nx, nz, s) && pets.every((q) =>
+    q === p || q.surface !== s || Math.hypot(q.x - nx, q.z - nz) >= p.radius + q.radius);
+  if (clear(x, z)) return { x, z, s };
+  const reach = s.floor ? 6 : Math.hypot(s.rect[2] - s.rect[0], s.rect[3] - s.rect[1]);
+  const step = s.floor ? 0.12 : 0.02;
+  for (let d = step; d < reach; d += step) {
     for (let i = 0; i < 20; i++) {
       const a = (i / 20) * Math.PI * 2;
       const nx = x + Math.cos(a) * d, nz = z + Math.sin(a) * d;
-      if (clear(nx, nz)) return [nx, nz];
+      if (clear(nx, nz)) return { x: nx, z: nz, s };
     }
   }
+  if (!s.floor) return landingSpot(x, z, p, FLOOR);
   throw new Error("No clear pet landing spot");
 }
 function dropPet() {
   if (!lift) return;
   const p = lift.pet;
+  const { x, z, s } = lift.land || landingSpot(p.x, p.z, p, lift.surface);
   lift = null;
+  landRing.visible = false;
   p.held = false;
-  const [x, z] = landingSpot(p.x, p.z, p);
+  p.surface = s; p.ground = s.y;
   if (REDUCED) {
     p.x = x; p.z = z;
     say(p.lines.land);
   } else {
-    p.fall = { x, z, y: LIFT_Y, vy: 0.4 };
+    p.fall = { x, z, y: p.hang, vy: 0.4 };
   }
   p.timer = 2 + Math.random() * 2;
   renderer.domElement.style.cursor = "";
@@ -1232,6 +1559,15 @@ function pokePet(p) {
   p.state = "idle"; p.visiting = null;
   p.timer = 2.5 + Math.random() * 2;
   faceCamera(p);
+  if (Math.random() < TANTRUM_CHANCE) {   // sometimes a tap is one tap too many
+    if (REDUCED) {   // just the move's pose and name, no wind-up or effects
+      play(p, p.move); say(p.lines.move, 2000);
+    } else {
+      play(p, "tantrum"); say(p.lines.tantrum, 1500);
+      p.cue = { kind: p.move, delay: ACT_LEN.tantrum };
+    }
+    return;
+  }
   const kind = REDUCED ? "still" : p.taps[p.tapIdx++ % p.taps.length];
   if (!REDUCED) play(p, kind);
   say(p.lines[kind]);
@@ -1779,6 +2115,8 @@ async function boot() {
     buildFurniture();
     await progress();
     buildPets();
+    buildParticles();
+    buildLandRing();
     await progress();
     buildLights();
     setNight(night, { silent: true });
